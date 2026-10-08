@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {checkRequest} from './lookup.js';
 const publicRoot=new URL('./public/',import.meta.url);
-const assets=new Map([['/',['index.html','text/html; charset=utf-8']],['/index.html',['index.html','text/html; charset=utf-8']],['/generator.js',['generator.js','text/javascript; charset=utf-8']],['/icon.svg',['icon.svg','image/svg+xml']],['/favicon.ico',['icon.svg','image/svg+xml']]]);
+const assets=new Map([['/',['index.html','text/html; charset=utf-8']],['/index.html',['index.html','text/html; charset=utf-8']],['/generator.js',['generator.js','text/javascript; charset=utf-8']],['/client-compute.js',['client-compute.js','text/javascript; charset=utf-8']],['/generator-worker.js',['generator-worker.js','text/javascript; charset=utf-8']],['/icon.svg',['icon.svg','image/svg+xml']],['/favicon.ico',['icon.svg','image/svg+xml']]]);
 const headers={'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"};
 function send(res,status,body,type='application/json'){if(res.destroyed)return;res.writeHead(status,{...headers,'Content-Type':type,'Cache-Control':'no-store'});res.end(body)}
 export function createApp(check=checkRequest){

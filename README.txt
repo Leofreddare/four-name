@@ -45,3 +45,37 @@ local test success is not a guarantee that Render's outgoing IP is accepted.
 https://render.com/docs/deploy-node-express-app
 https://render.com/docs/web-services
 https://render.com/docs/free
+
+Reset now clears all results, progress and export state, cancels any active scan,
+and resets the filters. Pending replies cannot bring cleared names back.
+Name generation runs in a Web Worker when supported, with a client CPU fallback.
+English dictionary matching is cached for faster filtering. Open Help → Client
+performance to see generation mode and WebGPU adapter availability. WebGPU is
+only detected: it does not speed up Minecraft network checks and is not used
+for compute. The server still performs the verified Minecraft lookups.
+
+POLISHED SCAN CONTROLS
+Pause holds progress and stops new lookups until Resume; an in-flight batch may
+finish, but its results are held. Stop ends the scan. Reset clears the result list.
+Names to check is the candidate batch slider. Skip names checked this session
+avoids duplicate lookups until reload; Check order chooses Random, A–Z or Z–A.
+The progress bar and approximate ETA use successful checks and exclude pauses.
+The moon/sun button toggles a saved light/dark theme, with dark as the default.
+Result order defaults to discovery order. Scroll anchoring preserves a visible
+card when new results or sorting change the grid. Export as CSV uses the explicit
+no_active_profile status instead of implying claimable availability.
+
+LOCKED NAMES
+The public lookup can return no active profile for a name which Minecraft still
+reserves, locks or blocks. The actual /minecraft/profile/name/{name}/available
+endpoint was tested without credentials and returned HTTP 401. This package
+cannot guarantee claimability or exclude every locked name without authenticated
+availability checks. No token entry has been added. Confirm a selected name on
+Minecraft.net while signed in. The UI now says No active profile instead of
+implying that these candidates are guaranteed available.
+
+NETWORK PERFORMANCE
+Two browser lookup pipelines overlap network waits. All Render visitors still
+share the server's bulk pacing of approximately one request per 700 ms. Rate-limit
+replies pause dispatch. Client workers generate candidates; duplicate session
+checks are skipped when enabled. No faster upstream rate is promised.
