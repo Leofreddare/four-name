@@ -31,3 +31,9 @@ suite: 7 groups passed. New icons are bundled. Scroll restoration preserved the 
 DOM test when an earlier sorted result was inserted. Actual browser scroll
 behavior has not been visually tested.
 No live Render deployment or availability authentication was used.
+
+Latest regressions: the Reset control no longer uses id="reset", which masks the
+native form reset method. HTTP tests enforce the renamed control. The DOM flow
+passed cancellation and clearing, a single checked-count label, newest-first
+insertion at scroll position zero, and preserving a scrolled card offset when
+a newer result is inserted. Scroll geometry is simulated, not browser visual QA.

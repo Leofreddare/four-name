@@ -61,8 +61,8 @@ Names to check is the candidate batch slider. Skip names checked this session
 avoids duplicate lookups until reload; Check order chooses Random, A–Z or Z–A.
 The progress bar and approximate ETA use successful checks and exclude pauses.
 The moon/sun button toggles a saved light/dark theme, with dark as the default.
-Result order defaults to discovery order. Scroll anchoring preserves a visible
-card when new results or sorting change the grid. Export as CSV uses the explicit
+Result order defaults to newest first. At the top, new names appear immediately.
+When scrolled down, the visible card stays in place as new results arrive. Export as CSV uses the explicit
 no_active_profile status instead of implying claimable availability.
 
 LOCKED NAMES
