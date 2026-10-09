@@ -2,7 +2,7 @@
 
 ## Automated checks completed
 
-`npm test` passed all 17 tests under Node.js 24.19.0.
+`npm test` passed all 19 tests under Node.js 24.19.0.
 
 - Platform-specific username formats and lengths; case normalization;
   display-name-like input, legacy Discord tags and consecutive periods.
@@ -14,8 +14,10 @@
   malformed or expired evidence falls back to Unknown. This verifies trusted
   operator evidence handling, not automatic discovery of hidden Mojang locks.
 - Exact TikTok/Snapchat profile data confirms Taken; generic HTML, echoed URLs,
-  mismatching usernames and 404s do not. Unsupported Discord availability and
-  disputed TikTok lengths remain Unknown.
+  mismatching usernames and 404s do not. Disputed TikTok lengths remain Unknown. Discord explicit boolean responses,
+  restriction errors, invalid formats, schema changes and challenges are covered.
+  Available caching expires after 15 seconds; manual refresh rechecks it. JSON
+  retry_after and exhausted rate-limit headers pace the shared Discord gate.
 - Cache TTLs and original observation timestamps; transport/5xx/malformed
   failures never yield availability and do not populate availability cache.
 - Manual Unknown retry refresh with retained Taken cache observations; dynamic
@@ -36,7 +38,7 @@
   and CSV export, exclusion of every other status, 10,000 synthetic Available
   **test fixtures** rendered in pages of 50, an honest empty state for unknown
   results, cancellation, theme toggling and original reset behavior.
-- HTTP tests reject multi-service requests and serve all four SVG assets.
+- HTTP tests reject multi-service requests and serve the Minecraft PNG and three social SVG assets.
 
 Synthetic Available fixtures exercise rendering and export only. They are never
 used by production adapters and are not evidence of live claimability. Browser
@@ -66,8 +68,15 @@ Browser contrast/layout/accessibility QA should be completed before public launc
 ## Scope and remaining limits
 
 This is a working Node application, not a public deployment. Provider HTML schemas
-can change; unrecognized responses remain Unknown. No current unauthenticated
-provider can affirm actual claimability. Hidden Minecraft name locks cannot be
-reliably discovered through the public UUID registry. Discord availability is
-unsupported through its documented public API. Run a single server instance for
+can change; unrecognized responses remain Unknown. Discord reports availability through its public signup check; its undocumented
+endpoint can change and final claiming remains platform/account dependent. Hidden Minecraft name locks cannot be
+reliably discovered through the public UUID registry. TikTok and Snapchat public profile absence does not establish availability.
+The old Snapchat signup endpoint returned 404; TikTok’s session-based availability
+endpoint returned an empty HTTP 200 without authentication. Run a single server instance for
 global in-memory rate control; coordinate rates centrally before scaling out.
+
+Follow-up production Discord live checks returned Taken for `nova`, Available
+for a random test candidate, and Restricted/Reserved for `discordtest` (explicit
+USERNAME_INVALID_CONTAINS). The Minecraft wordmark was replaced with a locally
+served public-domain grass-block image, inspected at its actual 256px resolution.
+No additional browser visual verification was claimed.

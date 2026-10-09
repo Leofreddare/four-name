@@ -35,9 +35,12 @@ claimability in your own account on Minecraft.net.
 TikTok and Snapchat checks only confirm Taken when a current, exact profile schema
 matches. A 200 response, echoed username, missing page, display name, privacy block
 or challenge page is insufficient. Schema drift fails closed to Unknown.
-Discord's documented API has no public unique-username availability operation.
-An undocumented signup probe used by Sherlock was reviewed and deliberately not
-used as an availability guarantee; Discord checks format and returns Unknown.
+Discord uses its public signup username check, without credentials. Only an exact
+`{"taken":false}` successful response emits Available; `taken:true` emits Taken.
+Recognized explicit platform restriction errors emit Restricted/Reserved. Unknown
+schemas, challenges, access blocks and failures remain Unknown. This signup
+endpoint is undocumented and can change. A check does not reserve a name or
+ensure a particular account can claim it; recheck in Discord before claiming.
 
 TikTok's official help specifies allowed characters and no trailing period, but
 not a definitive length range. Generation uses the common 2–24 range; list input
@@ -52,7 +55,7 @@ is implied for any platform.
 The original monochrome dark/light theme, logo, Arial typography, short-name
 filters, help dialog, result-card grid, copy, sort, pause, stop and reset controls
 are preserved. The only new visible control group is the service selector.
-It uses real service brand SVGs and radio buttons: exactly one service at a time,
+It uses local service icons (a colored Minecraft grass block and social brand SVGs) and radio buttons: exactly one service at a time,
 with Minecraft selected by default. The API also rejects multi-service requests.
 
 The original Names to check slider starts at 2,000. Minecraft and Discord support
@@ -62,10 +65,11 @@ The existing advanced filters and offline English-word matching are retained.
 
 **Only affirmatively Available results appear in the original name-card grid or
 CSV export.** Taken, Invalid, Restricted/Reserved and Unknown remain internal
-outcomes and are not displayed as names. No public provider currently emits
-Available, so a public check may show an empty grid and a single "Unable to verify
-availability" message. This is intentional: profile absence is never repackaged
-as availability. Progress counts still include all checked candidates.
+outcomes and are not displayed as names. Discord can emit Available from affirmative signup-check evidence. Minecraft,
+TikTok and Snapchat cannot currently confirm availability without credentials;
+their searches may show an empty grid and an "Unable to verify availability"
+message. TikTok/Snapchat explain this before a search. Profile absence is never
+repackaged as availability. Progress counts still include all checked candidates.
 
 There are no added status panels, status filters, per-result badges, evidence
 cards or input-mode tabs. Results remain bounded to 50 cards per page for large
@@ -74,8 +78,9 @@ cancellation and server-backed pause/resume are retained.
 
 Production transport has no third-party runtime dependencies. Native Node fetch
 reuses connections. Minecraft uses batches of ten with at most one request start
-per second; TikTok and Snapchat use at most one start per two seconds. Three
+per second; Discord, TikTok and Snapchat use at most one start per two seconds. Three
 simultaneous searches maximum, with rates shared globally within one process.
+Discord Available observations cache for only fifteen seconds and manual retry refreshes them.
 Taken observations cache for ten minutes; unresolved absence caches for one
 minute. Transient failures never turn into availability results. Fetch/body
 requests time out after ten seconds; transient errors use at most three attempts

@@ -7,7 +7,8 @@ import {createChecker} from './lookup.js';
 import {PLATFORMS} from './platforms.js';
 const publicRoot=new URL('./public/',import.meta.url);
 const assets=new Map([['/',['index.html','text/html; charset=utf-8']],['/index.html',['index.html','text/html; charset=utf-8']],['/app.js',['app.js','text/javascript; charset=utf-8']],['/styles.css',['styles.css','text/css; charset=utf-8']],['/platforms.js',[new URL('./platforms.js',import.meta.url),'text/javascript; charset=utf-8']],['/words.js',['words.js','text/javascript; charset=utf-8']],['/help-data.js',['help-data.js','text/javascript; charset=utf-8']],['/generator.js',['generator.js','text/javascript; charset=utf-8']],['/generator-worker.js',['generator-worker.js','text/javascript; charset=utf-8']],['/icon.svg',['icon.svg','image/svg+xml']],['/favicon.ico',['icon.svg','image/svg+xml']]]);
-for(const platform of Object.keys(PLATFORMS))assets.set('/service-icons/'+platform+'.svg',['service-icons/'+platform+'.svg','image/svg+xml']);
+assets.set('/service-icons/minecraft.png',['service-icons/minecraft.png','image/png']);
+for(const platform of Object.keys(PLATFORMS).filter(p=>p!=='minecraft'))assets.set('/service-icons/'+platform+'.svg',['service-icons/'+platform+'.svg','image/svg+xml']);
 const headers={'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"};
 function send(res,status,body,type='application/json'){if(res.destroyed)return;res.writeHead(status,{...headers,'Content-Type':type,'Cache-Control':'no-store'});res.end(body)}
 export function validateJob(body){

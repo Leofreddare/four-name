@@ -41,8 +41,9 @@
   Inspected TikTok, Snapchat and Discord entries. Snapchat uses public profile
   status codes; TikTok uses missing-profile strings; Discord uses an undocumented
   signup probe. **None of these absence heuristics was copied as proof of
-  claimability.** This app uses exact positive structured profile matches for
-  social Taken results and does not call Discord's undocumented signup probe.
+  claimability.** TikTok and Snapchat use exact positive structured profile matches for Taken.
+  Discord now calls the unauthenticated signup check after direct live validation;
+  its explicit boolean response is different from a missing-profile heuristic.
 - CmlLib MojangAPI implementation (MIT):
   https://github.com/CmlLib/MojangAPI/blob/master/MojangAPI/Mojang.cs
   `CheckNameAvailability` uses `minecraft/profile/name/{name}/available` with
@@ -103,9 +104,40 @@ The selection control uses real brand SVG artwork, stored locally:
   https://github.com/FortAwesome/Font-Awesome/tree/6.7.2/svgs/brands
   SVG attribution comments remain intact. CC BY 4.0 icon license and full
   attribution are preserved in licenses/FontAwesome.txt.
-- Minecraft: Simple Icons 11.0.0 Minecraft mark, downloaded from
-  https://github.com/simple-icons/simple-icons/blob/11.0.0/icons/minecraft.svg
-  CC0 license is included in licenses/SimpleIcons.txt.
+- Minecraft: recognizable colored grass/dirt block artwork by Neo-TheDragon,
+  published in 2011 as public domain: https://www.rw-designer.com/icon-detail/5547
+  Downloaded the actual ICO and converted its 256px representation to a local
+  PNG. Source/attribution are in licenses/MinecraftIcon.txt. The previous Simple
+  Icons wordmark is no longer used. Social SVGs retain the original monochrome
+  styling; the grass block keeps its colors. No affiliation is implied.
 
-Brand artwork is shown as a monochrome icon to match the original theme, not
-as a fabricated text glyph. No affiliation with any service is implied.
+## Follow-up implementation research and live probes
+
+- https://github.com/alimawla961/discord-usernames-checker/blob/main/index.js
+  Inspected the source's public `username-attempt-unauthed` POST and response
+  handling. Wrote an independent strict parser; no source code copied, no proxy
+  rotation or rate-limit bypass incorporated. Live `nova` returned 200 with
+  `taken:true`; test candidate `fncheck8x9p2` returned 200 with `taken:false`;
+  `discordtest` returned 400/50035/USERNAME_INVALID_CONTAINS. Production adapter
+  corroborated the three outcomes. These are time-of-check results, not name
+  reservations or an account-specific claim guarantee.
+- https://github.com/SudoSuu/SnapchatUsernameChecker/blob/su/snapchat.py
+  The old `get_username_suggestions` endpoint returned HTTP 404 for both a known
+  name and a test candidate, even after a normal anonymous signup-page request.
+  Do not bundle this broken method or its hardcoded CSRF token.
+- https://accounts.snapchat.com/v2/signup
+  Inspected current public JavaScript, including the username format validator:
+  at most one internal separator. Corrected the shared local rule. The signup
+  flow includes CAPTCHA/attestation; no account creation or challenge bypass was
+  attempted. No reliable public availability replacement was established.
+- https://github.com/onemanbuilds/TikTokUsernameChecker/blob/main/main.py
+  The unique-id check method sends a session cookie from the user's token. One
+  unauthenticated request to `api/uniqueid/check/?aid=1233&unique_id=fncheck8x9p2`
+  returned HTTP 200 with an empty body, not a usable availability result.
+- https://github.com/useragents/Proxyless-TikTok-Username-Checker/blob/main/main.py
+  Its 404 branch labels names "Available or Banned". That does not distinguish
+  claimable names, so it was not copied. The app retains positive profile
+  evidence for Taken and honest Unknown results for everything inconclusive.
+
+No executable source from these checkers is bundled. No tokens, passwords,
+account creation, fabricated availability, CAPTCHA solving or restriction bypass.
