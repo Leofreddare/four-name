@@ -67,8 +67,10 @@ The existing advanced filters and offline English-word matching are retained.
 CSV export.** Taken, Invalid, Restricted/Reserved and Unknown remain internal
 outcomes and are not displayed as names. Discord can emit Available from affirmative signup-check evidence. Minecraft,
 TikTok and Snapchat cannot currently confirm availability without credentials;
-their searches may show an empty grid and an "Unable to verify availability"
-message. TikTok/Snapchat explain this before a search. Profile absence is never
+Minecraft searches may show an empty grid and an "Unable to verify availability"
+message. TikTok/Snapchat bulk availability searches are rejected immediately,
+before generation or network activity, with the limitation explained. The
+internal single-profile parser remains available for positive Taken observations. Profile absence is never
 repackaged as availability. Progress counts still include all checked candidates.
 
 There are no added status panels, status filters, per-result badges, evidence
@@ -78,14 +80,21 @@ cancellation and server-backed pause/resume are retained.
 
 Production transport has no third-party runtime dependencies. Native Node fetch
 reuses connections. Minecraft uses batches of ten with at most one request start
-per second; Discord, TikTok and Snapchat use at most one start per two seconds. Three
+per second; Discord starts at one request per five seconds and slows down after 429s.
+The internal TikTok/Snapchat single-profile checks are paced at two seconds. Three
 simultaneous searches maximum, with rates shared globally within one process.
 Discord Available observations cache for only fifteen seconds and manual retry refreshes them.
 Taken observations cache for ten minutes; unresolved absence caches for one
 minute. Transient failures never turn into availability results. Fetch/body
 requests time out after ten seconds; transient errors use at most three attempts
-and exponential backoff with jitter. Retry-After windows are never shortened.
-401/403 or opaque pages stop further requests via a short circuit. No bypass is
+and exponential backoff with jitter. Retry-After windows are never shortened. Discord uses the longer of the header
+and JSON retry_after windows. Bulk runs wait through long cooldowns with a
+visible countdown and retry the same name automatically, at most three cooldown
+recoveries per batch. The wait is cancellable and respects pause/resume.
+401/403, opaque pages and exhausted transient retries interrupt a bulk scan.
+No unrequested tail is counted as checked. The original Find names button becomes
+Resume search for unfinished work, retaining completed results.
+401/403 or opaque pages also stop further requests via a short circuit. No bypass is
 attempted. Disconnects and Stop abort active and queued work.
 
 Configure reverse proxies to avoid buffering `/api/check`. Deploy one Node

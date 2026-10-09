@@ -95,3 +95,23 @@ test('Discord JSON retry windows and exhausted rate headers control the shared g
  const pauses=[];const paced=checker({now:()=>time,wait:async ms=>{pauses.push(ms);time+=ms},fetchImpl:async()=>Response.json({taken:false},{headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset-after':'4.5'}})});
  await paced.check('discord',['freshfixture'],signal());await paced.check('discord',['otherfixture'],signal());assert.deepEqual(pauses,[4500]);
 });
+
+test('long Discord throttling retries the same name after the full window and streams only checked results',async()=>{
+ let time=1700000000000;const start=time,calls=[],pauses=[],events=[];
+ const c=checker({now:()=>time,wait:async ms=>{assert(ms<=30000);pauses.push(ms);time+=ms},fetchImpl:async(url,options)=>{calls.push({name:JSON.parse(options.body).username,time});return calls.length===1?Response.json({retry_after:90},{status:429,headers:{'Retry-After':'60'}}):Response.json({taken:false})}});
+ await c.run({names:['firstfixture','secondfixture'],platforms:['discord']},signal(),async e=>events.push(e));
+ assert.deepEqual(calls.map(c=>c.name),['firstfixture','firstfixture','secondfixture']);assert(calls[1].time>=start+90000);assert.equal(events.at(-1).type,'done');assert(events.some(e=>e.waiting===true));assert(events.some(e=>e.waiting===false));assert.equal(events.flatMap(e=>e.rows||[]).length,2);assert(events.flatMap(e=>e.rows||[]).every(r=>r.status==='Available'));assert(pauses.length>=3);
+});
+test('cooldown waits can be cancelled and paused before retry without checking later names',async()=>{
+ let notifyWait,release;const waiting=new Promise(r=>notifyWait=r);const controller=new AbortController();let calls=0;
+ const c=checker({fetchImpl:async()=>{calls++;return Response.json({retry_after:90},{status:429})},wait:async(ms,unused,{signal})=>{notifyWait();return new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}))}});
+ const task=c.run({names:['firstfixture','secondfixture'],platforms:['discord']},controller.signal,async()=>{});await waiting;controller.abort();await assert.rejects(task,{name:'AbortError'});assert.equal(calls,1);
+ let time=1700000000000,paused=false,checked=0;const held=new Promise(r=>release=r),seen=[];
+ const pausedChecker=checker({now:()=>time,wait:async ms=>{time+=ms;paused=true},fetchImpl:async()=>++checked===1?Response.json({retry_after:60},{status:429}):Response.json({taken:false})});
+ const run=pausedChecker.run({names:['firstfixture'],platforms:['discord']},signal(),async e=>seen.push(e),async()=>{if(paused)await held});await new Promise(r=>setTimeout(r,10));assert.equal(checked,1);paused=false;release();await run;assert.equal(checked,2);assert.equal(seen.at(-1).type,'done');
+});
+test('blocked searches halt without counting the unrequested tail; unsupported social scans fail immediately',async()=>{
+ let calls=0;const c=checker({fetchImpl:async()=>{calls++;return new Response('',{status:403})}}),events=[];
+ await c.run({names:['firstfixture','secondfixture','thirdfixture'],platforms:['discord']},signal(),async e=>events.push(e));assert.equal(calls,1);assert.equal(events.flatMap(e=>e.rows||[]).length,0);assert.equal(events.at(-1).type,'error');assert(!events.some(e=>e.type==='done'));
+ for(const p of ['tiktok','snapchat']){const events=[];await c.run({names:['firstfixture','secondfixture'],platforms:[p]},signal(),async e=>events.push(e));assert.equal(calls,1);assert.equal(events.at(-1).type,'error');assert(events.at(-1).message.includes('No names were checked'))}
+});

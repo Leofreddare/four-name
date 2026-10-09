@@ -141,3 +141,18 @@ The selection control uses real brand SVG artwork, stored locally:
 
 No executable source from these checkers is bundled. No tokens, passwords,
 account creation, fabricated availability, CAPTCHA solving or restriction bypass.
+
+## Rate-limit handling correction — 2026-10-09
+
+- https://docs.discord.com/developers/topics/rate-limits
+  Rechecked Discord's official rate-limit response/header documentation. The
+  server now takes the longer supplied header/body window, waits and retries
+  the same name during bulk runs, and increases request spacing after 429s.
+  There is no proxy rotation, endpoint switching or attempt to evade IP limits.
+- Live re-probes: Discord accepted a single candidate and returned taken:false;
+  TikTok's unauthenticated unique-id check again returned an empty HTTP 200;
+  Snapchat's old suggestion endpoint again returned HTTP 404. These responses
+  cannot supply verified available usernames for the latter two services.
+  Their bulk availability scans now fail immediately, not after a misleading
+  count of thousands of unrequested results. Official OAuth profile APIs are
+  not treated as unauthenticated username availability APIs.

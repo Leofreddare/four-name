@@ -2,7 +2,7 @@
 
 ## Automated checks completed
 
-`npm test` passed all 19 tests under Node.js 24.19.0.
+`npm test` passed all 22 tests under Node.js 24.19.0.
 
 - Platform-specific username formats and lengths; case normalization;
   display-name-like input, legacy Discord tags and consecutive periods.
@@ -80,3 +80,19 @@ for a random test candidate, and Restricted/Reserved for `discordtest` (explicit
 USERNAME_INVALID_CONTAINS). The Minecraft wordmark was replaced with a locally
 served public-domain grass-block image, inspected at its actual 256px resolution.
 No additional browser visual verification was claimed.
+
+## Cooldown and interrupted-search correction
+
+Three additional engine regression tests cover full 90-second cooldown recovery
+with a simulated clock (including conflicting header/body windows), retrying the
+same name before the next one, cancellation during waiting, pause before retry,
+and stopping an access-blocked run without emitting fabricated checked results.
+Unsupported TikTok/Snapchat bulk scans emit an immediate error without HTTP calls.
+DOM checks additionally cover the live countdown text, Stop, resuming only
+unfinished names, and rejecting unsupported social searches before generation.
+All 22 tests passed. Simulated cooldown recovery is explicitly not a claim that a
+production IP cannot be rate limited; Discord controls the actual retry window.
+
+A live three-name Discord bulk run completed with Taken, Available, and
+Restricted/Reserved results followed by done. This confirms the streaming bulk
+path on this workspace IP; the long-throttle recovery was tested with fixtures.

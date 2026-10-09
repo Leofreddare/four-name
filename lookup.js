@@ -63,7 +63,7 @@ export function parseDiscord(name,status,data){
  throw Error('Unexpected Discord signup response');
 }
 export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=delay,restrictions=[]}={}){
- const gates=Object.fromEntries(['minecraft','tiktok','snapchat','discord'].map(p=>[p,new Gate(intervals[p]??(p==='minecraft'?1000:2000),now,wait)]));
+ const gates=Object.fromEntries(['minecraft','tiktok','snapchat','discord'].map(p=>[p,new Gate(intervals[p]??(p==='minecraft'?1000:p==='discord'?5000:2000),now,wait)]));
  const cache=new Map();const circuits=new Map();
  // Optional operator evidence, never inferred from missing profiles. No names ship on this list.
  const evidence=new Map();for(const r of restrictions){if(PLATFORMS[r.platform]&&typeof r.name==='string'&&typeof r.reason==='string'&&r.reason.length&&/^https:\/\//.test(r.source||'')&&Number.isFinite(Date.parse(r.confirmedAt))&&Date.parse(r.confirmedAt)<=now()&&Date.parse(r.expiresAt)>now()&&Date.parse(r.expiresAt)-Date.parse(r.confirmedAt)<=86400000)evidence.set(r.platform+':'+normalize(r.name),r)}
@@ -77,7 +77,9 @@ export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=de
     const json=platform==='minecraft'||platform==='discord';
     const response=await fetchImpl(url,{method:json?'POST':'GET',headers:{Accept:json?'application/json':'text/html','User-Agent':'FourName/2.0 public-username-checker',...(json?{'Content-Type':'application/json'}:{})},...(json?{body:JSON.stringify(platform==='discord'?{username:names[0]}:names)}:{}),redirect:'error',signal:combined});
     if(response.status===429){
-     let value=response.headers.get('Retry-After');if(platform==='discord'&&!value){try{const data=JSON.parse(await readBounded(response,65536));if(typeof data.retry_after==='number'&&data.retry_after>=0)value=String(data.retry_after)}catch{}}const cooldown=Math.max(retryAfter(value,now()),1000*2**attempt);gate.throttle(cooldown);await response.body?.cancel().catch(()=>{});await notice?.({type:'notice',platform,message:'Rate limited. Respecting the platform’s retry window.',retryAt:new Date(gate.cooldown).toISOString()});
+     const header=response.headers.get('Retry-After');let cooldown=header?retryAfter(header,now()):null;
+     if(platform==='discord'){try{const data=JSON.parse(await readBounded(response,65536));if(typeof data.retry_after==='number'&&Number.isFinite(data.retry_after)&&data.retry_after>=0)cooldown=Math.max(cooldown??0,retryAfter(String(data.retry_after),now()))}catch{}gate.interval=Math.min(60000,Math.max(gate.interval,5000)*1.5)}
+     cooldown=Math.max(cooldown??60000,1000*2**attempt);gate.throttle(cooldown);await response.body?.cancel().catch(()=>{});await notice?.({type:'notice',platform,message:'Rate limited. Respecting the platform’s retry window.',retryAt:new Date(gate.cooldown).toISOString()});
      // Never shorten Retry-After. Long windows return retryable results instead of tying up a run.
      if(cooldown<=10000&&attempt<2)continue;
      circuits.set(platform,{until:gate.cooldown,reason:'Rate limited. Retry after the platform cooldown.',code:'throttled'});
@@ -118,8 +120,29 @@ export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=de
  }
  async function run({names,platforms,refresh=false},signal,emit,waitForResume=async()=>{}){
   const unique=[...new Set(names.map(normalize))];await emit({type:'meta',names:unique.length,total:unique.length*platforms.length,platforms});
-  // Independent platform workers; at most four per search, with globally paced upstream requests.
-  await Promise.all(platforms.map(async platform=>{const size=platform==='minecraft'?10:1;for(let i=0;i<unique.length;i+=size){signal.throwIfAborted();await waitForResume();const rows=await check(platform,unique.slice(i,i+size),signal,notice=>emit(notice),refresh);await emit({type:'results',rows})}}));
+  const unsupported=platforms.find(p=>PLATFORMS[p].availability===false);
+  if(unsupported){await emit({type:'error',message:PLATFORMS[unsupported].label+' bulk availability cannot currently be verified without authenticated platform access. Check the username in the official app. No names were checked.'});return}
+  // Requests share the process-wide gate. A cooldown is a wait, never a result.
+  for(const platform of platforms){
+   const size=platform==='minecraft'?10:1;
+   for(let i=0;i<unique.length;i+=size){
+    signal.throwIfAborted();await waitForResume();const batch=unique.slice(i,i+size);let rows;
+    for(let retry=0;;retry++){
+     rows=await check(platform,batch,signal,notice=>emit(notice),refresh);
+     const throttled=rows.find(r=>r.code==='throttled');
+     if(!throttled)break;
+     if(retry>=3){await emit({type:'error',message:PLATFORMS[platform].label+' is still rate limiting this server. Search interrupted; unchecked names are preserved. Resume later after '+new Date(throttled.retryAt).toLocaleTimeString()+'.'});return}
+     let until=Date.parse(throttled.retryAt);
+     await emit({type:'notice',platform,waiting:true,message:'Waiting for the platform cooldown. This name will be retried automatically.',retryAt:new Date(until).toISOString()});
+     while(now()<until){signal.throwIfAborted();await waitForResume();await wait(Math.min(30000,until-now()),undefined,{signal});until=Math.max(until,gates[platform].cooldown)}
+     await waitForResume();await emit({type:'notice',platform,waiting:false,message:'Cooldown finished. Resuming the same name.'});
+    }
+    // A blocked circuit must not produce thousands of fictitious checked rows.
+    const failed=rows.find(r=>['blocked','opaque','transient'].includes(r.code));
+    if(failed){await emit({type:'error',message:PLATFORMS[platform].label+': '+failed.reason+' Search interrupted; remaining names were not checked.'});return}
+    await emit({type:'results',rows});
+   }
+  }
   signal.throwIfAborted();await emit({type:'done'});
  }
  return {run,check,gates,cache};
