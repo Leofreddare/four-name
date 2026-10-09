@@ -1,6 +1,6 @@
-# Four Name Studio
+# Four Name
 
-A redesigned, credential-free username explorer for Minecraft Java Edition,
+The original Four Name monochrome interface, expanded as a credential-free username explorer for Minecraft Java Edition,
 TikTok, Snapchat and Discord. Node.js 22–24; production has no third-party runtime
 dependencies. Platform checks run on the server, not through browser CORS workarounds.
 
@@ -76,9 +76,13 @@ is implied for any platform.
 - Results show name and platform progress, all five status counts, elapsed time,
   evidence, cached timestamps, cooldown times, search/filter controls, retries,
   pagination and formula-safe CSV export. Only 50 rows exist in the DOM at once.
-- Restrained motion, native keyboard controls, tab arrow-key navigation, focus
-  indicators, reduced-motion CSS, a skip link, live completion announcements,
-  responsive layout, and no remote fonts/scripts/analytics.
+- Original dark/light themes, logo, layout, typography, icon subset, filter guide,
+  word matching, advanced filters, result sorting, copy controls and reset are
+  preserved. Server-backed pause/resume holds results and stops new batches.
+  Session-skip behavior is preserved; unknown results remain explicitly retryable.
+- Native keyboard controls, tab arrow-key navigation, focus indicators, reduced
+  motion, live completion announcements and the original responsive layout.
+  No remote fonts/scripts/analytics.
 
 Limits are conservative application limits, not promises of platform quotas.
 Network requests share one limiter per process: **deploy one Node instance** or

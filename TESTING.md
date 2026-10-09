@@ -2,7 +2,7 @@
 
 ## Automated checks completed
 
-`npm test` passed all 16 tests under Node.js 24.19.0.
+`npm test` passed all 17 tests under Node.js 24.19.0.
 
 - Platform-specific username formats and lengths; case normalization;
   display-name-like input, legacy Discord tags and consecutive periods.
@@ -28,15 +28,19 @@
   validation, limits, NDJSON event order and asset/CSP delivery.
 - Generator deduplication, 2–32-character support, finite search exhaustion,
   contradictory filters, yielding and cancellation.
+- Restored pause/resume holds a completed batch and prevents the next batch
+  until resumed; per-search control IDs are required.
 - DOM interaction tests: 2,000 default; slider/exact numeric synchronization;
   social limit adaptation; 10,000-name run; 50 rendered rows; pagination,
   status/name filtering, keyboard tabs, safe rendering of script-shaped input,
-  list deduplication and cancel/re-enable behavior.
+  list deduplication, cancel/re-enable behavior, theme toggle and original reset.
+  The original stylesheet is preserved as the base, and the logo is restored
+  byte-for-byte from the attachment. Browser visual QA remains blocked as below.
 
-The 10,000-name synthetic UI run completed in approximately 106 ms in jsdom on
+The 10,000-name synthetic UI run completed in approximately 151 ms in jsdom on
 one run, with 50 result rows. This measures application/DOM logic, **not browser
 paint performance or live network search speed**. The local-only 10,000-name
-server run took approximately 18 ms on the same run.
+server run took approximately 24 ms on the same run.
 
 ## Live checks completed
 

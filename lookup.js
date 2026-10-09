@@ -96,10 +96,10 @@ export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=de
   if(pending.length){const fresh=await upstream(platform,pending,signal,notice);for(const row of fresh){if(row.status==='Taken'||row.code==='unresolved'){const key=platform+':'+row.name;cache.delete(key);cache.set(key,{row,expires:now()+(row.status==='Taken'?600000:60000)});if(cache.size>20000)cache.delete(cache.keys().next().value)}rows.push(row)}}
   return rows;
  }
- async function run({names,platforms,refresh=false},signal,emit){
+ async function run({names,platforms,refresh=false},signal,emit,waitForResume=async()=>{}){
   const unique=[...new Set(names.map(normalize))];await emit({type:'meta',names:unique.length,total:unique.length*platforms.length,platforms});
   // Independent platform workers; at most four per search, with globally paced upstream requests.
-  await Promise.all(platforms.map(async platform=>{const size=platform==='minecraft'?10:platform==='discord'?100:1;for(let i=0;i<unique.length;i+=size){signal.throwIfAborted();const rows=await check(platform,unique.slice(i,i+size),signal,notice=>emit(notice),refresh);await emit({type:'results',rows})}}));
+  await Promise.all(platforms.map(async platform=>{const size=platform==='minecraft'?10:platform==='discord'?100:1;for(let i=0;i<unique.length;i+=size){signal.throwIfAborted();await waitForResume();const rows=await check(platform,unique.slice(i,i+size),signal,notice=>emit(notice),refresh);await emit({type:'results',rows})}}));
   signal.throwIfAborted();await emit({type:'done'});
  }
  return {run,check,gates,cache};

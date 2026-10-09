@@ -83,9 +83,11 @@ The original archive recorded inspection/reuse of these projects on 2026-10-08:
   Commit bf73eafc87fc8d435141a97452b98dbe4cda5f58.
 
 The attached generator has been retained and extended. The unsafe absence-as-
-unclaimed lookup behavior and old interface were replaced. Original MIT license
+unclaimed lookup behavior and old request orchestration were replaced; the original visual theme and interface
+were restored at the user’s request. The original word list, help content and
+Font Awesome icon subset are preserved. Original MIT license
 files remain in `licenses/`. Historical Font Awesome attribution/license is also
-preserved, although the new interface uses original shapes and text glyphs.
+preserved, and applies to the restored interface’s embedded icon subset.
 No external images, fonts or icon CDN are needed.
 
 Node built-ins implement the runtime server and fetch transport. jsdom and

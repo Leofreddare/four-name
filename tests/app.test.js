@@ -68,3 +68,11 @@ test('manual retry refreshes unresolved cache while retaining Taken observations
 test('globally paced gate rechecks a newly raised cooldown before admission',async()=>{
  let now=0,waits=[];const gate=new Gate(100,()=>now,async ms=>{waits.push(ms);now+=ms;if(waits.length===1)gate.throttle(300)});await gate.enter(signal());await gate.enter(signal());assert.deepEqual(waits,[100,300]);assert.equal(now,400);
 });
+test('restored pause control holds completed batches and stops new checks until resume',async()=>{
+ let release,started;const firstStarted=new Promise(r=>started=r);let calls=0;
+ const c=checker({fetchImpl:async()=>{calls++;if(calls===1){started();await new Promise(r=>release=r)}return Response.json([])}});
+ const server=createApp(c);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
+ try{const response=await fetch(base+'/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:Array.from({length:20},(_,i)=>'name'+i),platforms:['minecraft']})});const reader=response.body.getReader();let raw=new TextDecoder().decode((await reader.read()).value);const meta=JSON.parse(raw.trim().split('\n')[0]);assert(meta.jobId);await firstStarted;
+ const control=async(action,jobId=meta.jobId)=>fetch(base+'/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,jobId})});assert.equal((await control('pause','missing')).status,404);assert.equal((await control('pause')).status,200);release();await new Promise(r=>setTimeout(r,30));assert.equal(calls,1);assert.equal((await control('resume')).status,200);for(;;){const part=await reader.read();if(part.done)break;raw+=new TextDecoder().decode(part.value)}assert.equal(calls,2);const events=raw.trim().split('\n').map(JSON.parse);assert.equal(events.filter(e=>e.type==='results').length,2);assert.equal(events.at(-1).type,'done');
+ }finally{server.cancelSearches();server.closeAllConnections();await new Promise(r=>server.close(r))}
+});

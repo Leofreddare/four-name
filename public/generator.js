@@ -1,5 +1,5 @@
 /* Original browser generator for Four Name. Yields periodically to keep Stop responsive. */
-const WORDS=[];
+import {WORDS} from "./words.js";
 export async function generateCandidates(f, stopped=()=>false) {
  const n=f.length, alphabet={letters:'abcdefghijklmnopqrstuvwxyz',mixed:'abcdefghijklmnopqrstuvwxyz0123456789',all:'abcdefghijklmnopqrstuvwxyz0123456789_',digits:'0123456789'}[f.chars];
  if(!alphabet||!Number.isInteger(n)||n<2||n>32||!Number.isInteger(f.limit)||f.limit<1||f.limit>10000)throw Error('Invalid search settings.');

@@ -1,4 +1,4 @@
-Four Name Studio 2.0
+Four Name 2.0 — original theme
 
 Run: npm ci, then npm start. Open http://localhost:3000.
 Run automated checks: npm test.
