@@ -1,66 +1,107 @@
-const json=(status,data)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
-let nextBulkRequest=0;
-let individualEndpoint='',individualValidUntil=0,nextIndividualRequest=0,bulkDeniedUntil=0;
-const validProfile=(p,name)=>p&&typeof p.name==='string'&&p.name.toLowerCase()===name&&typeof p.id==='string'&&/^[0-9a-f]{32}$/i.test(p.id);
-async function getIndividual(base,name){
- const slot=Math.max(Date.now(),nextIndividualRequest);nextIndividualRequest=slot+700;
- if(slot>Date.now())await new Promise(r=>setTimeout(r,slot-Date.now()));
- const url=base+name;
- const response=await fetch(url,{headers:{'Accept':'application/json','User-Agent':'FourName/11.0'},signal:AbortSignal.timeout(5000)});
- if(response.status===429){const raw=response.headers.get('Retry-After'),seconds=Number(raw),date=Date.parse(raw);throw {rate:true,seconds:Math.max(1,Math.min(900,Math.ceil(raw&&Number.isFinite(seconds)?seconds:Number.isFinite(date)?(date-Date.now())/1000:60)))}}
- let body;try{body=await response.json()}catch{throw Error(new URL(base).hostname+' GET HTTP '+response.status+' invalid JSON')}
- if(response.status===200&&validProfile(body,name))return {name,taken:true,profile:body};
- if(response.status===404&&body.path===new URL(url).pathname&&body.errorMessage==="Couldn't find any profile with name "+name)return {name,taken:false};
- throw Error(new URL(base).hostname+' GET HTTP '+response.status+(response.ok?' invalid profile':''));
-}
-async function individualFallback(names,failures){
- try{
-  if(!individualEndpoint||Date.now()>individualValidUntil){
-   individualEndpoint='';
-   for(const base of ['https://api.minecraftservices.com/minecraft/profile/lookup/name/','https://api.mojang.com/users/profiles/minecraft/']){
-    try{const probe=await getIndividual(base,'notch');if(!probe.taken||probe.profile.id.toLowerCase()!=='069a79f444e94726a5befca90e38aaf5')throw Error('Known-profile verification failed');individualEndpoint=base;individualValidUntil=Date.now()+300000;break}catch(error){if(error.rate)throw error;failures.push(error.message||'GET probe failed')}
-   }
-   if(!individualEndpoint)return null;
-  }
-  const replies=await Promise.allSettled(names.map(name=>getIndividual(individualEndpoint,name)));
-  const rate=replies.find(r=>r.status==='rejected'&&r.reason.rate);if(rate)return json(429,{error:'Waiting for Minecraft.',retry_after:rate.reason.seconds});
-  const failure=replies.find(r=>r.status==='rejected');if(failure){individualValidUntil=0;failures.push(failure.reason.message||'Individual lookup failed');return null}
-  const checked_at=new Date().toISOString();return json(200,{lookup_mode:'individual',results:replies.filter(r=>!r.value.taken).map(r=>({name:r.value.name,status:'unclaimed',checked_at}))});
- }catch(error){if(error.rate)return json(429,{error:'Waiting for Minecraft.',retry_after:error.seconds});individualValidUntil=0;failures.push(error.message||'Individual lookup failed');return null}
-}
-
-async function onRequestPost({request}) {
- const origin=request.headers.get('Origin');if(origin&&origin!==new URL(request.url).origin)return json(403,{error:'Use this site to search.'});
- if(!request.headers.get('Content-Type')?.startsWith('application/json'))return json(415,{error:'Expected JSON.'});
- const raw=await request.text();if(raw.length>1024)return json(413,{error:'Batch too large.'});let names;
- try{names=JSON.parse(raw).names}catch{return json(400,{error:'Invalid JSON.'})}
- if(!Array.isArray(names)||!names.length||names.length>10||names.some(n=>typeof n!=='string'||!/^[a-z0-9_]{3,7}$/.test(n))||new Set(names).size!==names.length)return json(400,{error:'Send 1–10 distinct names.'});
- const endpoints=[
-  'https://api.mojang.com/minecraft/profile/lookup/bulk/byname',
-  'https://api.minecraftservices.com/minecraft/profile/lookup/bulk/byname',
-  'https://api.mojang.com/profiles/minecraft'
- ];
- const failures=[];
- for(const endpoint of (Date.now()<bulkDeniedUntil?[]:endpoints)){
-  try{
-   const slot=Math.max(Date.now(),nextBulkRequest);if(slot-Date.now()>10000)return json(429,{error:'Checker busy. Waiting to resume.',retry_after:10});nextBulkRequest=slot+700;if(slot>Date.now())await new Promise(r=>setTimeout(r,slot-Date.now()));
-   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','User-Agent':'FourName/10.0'},body:JSON.stringify(names),signal:AbortSignal.timeout(5000)});
-   if(response.status===429){const header=response.headers.get('Retry-After');const seconds=Number(header);const date=Date.parse(header);const retry=header&&Number.isFinite(seconds)?seconds:Number.isFinite(date)?(date-Date.now())/1000:60;return json(429,{error:'Waiting for Minecraft.',retry_after:Math.max(1,Math.min(900,Math.ceil(retry)))})}
-   const host=new URL(endpoint).hostname;
-   if(!response.ok){failures.push(host+' HTTP '+response.status);continue}
-   let profiles;try{profiles=await response.json()}catch{failures.push(host+' invalid JSON');continue}
-   if(!Array.isArray(profiles)||profiles.length>names.length){failures.push(host+' invalid response');continue}
-   const taken=new Set();let valid=true;
-   for(const p of profiles){if(!p||typeof p.name!=='string'||!names.includes(p.name.toLowerCase())||typeof p.id!=='string'||!/^[0-9a-f]{32}$/i.test(p.id)||taken.has(p.name.toLowerCase())){valid=false;break}taken.add(p.name.toLowerCase())}
-   if(!valid){failures.push(host+' invalid profile');continue}
-   const checked_at=new Date().toISOString();return json(200,{results:names.filter(n=>!taken.has(n)).map(name=>({name,status:'unclaimed',checked_at}))});
-  }catch(error){failures.push(new URL(endpoint).hostname+(error.name==='TimeoutError'||error.name==='AbortError'?' timed out':' connection failed'))}
+import {setTimeout as delay} from 'node:timers/promises';
+import {PLATFORMS,normalize,validate} from './platforms.js';
+const uuid=/^[a-f0-9]{32}$/i;
+export function retryAfter(value,now=Date.now()){
+ if(value!==null&&value!==undefined&&value!==''){
+  const seconds=Number(value);if(Number.isFinite(seconds)&&seconds>=0)return Math.max(1000,seconds*1000);
+  const date=Date.parse(value);if(Number.isFinite(date))return Math.max(1000,date-now);
  }
- if(failures.length===3&&failures.every(message=>message.includes('HTTP 403')))bulkDeniedUntil=Date.now()+300000;
- const individual=await individualFallback(names,failures);if(individual)return individual;
- return json(502,{error:'Minecraft lookup unavailable: '+failures.join('; ')+'. No names were accepted.',upstream_failures:failures});
-
+ return 60000;
 }
-const onRequestGet=()=>json(405,{error:'Use POST.'});
-
-export async function checkRequest(request){return onRequestPost({request});}
+export class Gate {
+ constructor(interval,now=Date.now,wait=delay){this.interval=interval;this.now=now;this.wait=wait;this.next=0;this.cooldown=0;this.tail=Promise.resolve()}
+ async enter(signal){
+  let release;const previous=this.tail;this.tail=new Promise(r=>release=r);
+  try{
+   let abort;const stopped=new Promise((_,reject)=>{abort=()=>reject(signal.reason);signal.addEventListener('abort',abort,{once:true})});
+   try{signal.throwIfAborted();await Promise.race([previous,stopped])}catch(error){previous.finally(release);release=()=>{};throw error}finally{signal.removeEventListener('abort',abort)}
+   signal.throwIfAborted();let pause=Math.max(this.next,this.cooldown)-this.now();while(pause>0){await this.wait(pause,undefined,{signal});signal.throwIfAborted();pause=Math.max(this.next,this.cooldown)-this.now()}signal.throwIfAborted();this.next=this.now()+this.interval}finally{release()}
+ }
+ throttle(ms){this.cooldown=Math.max(this.cooldown,this.now()+ms)}
+}
+export async function readBounded(response,max=2*1024*1024){
+ const reader=response.body?.getReader();if(!reader)return '';let size=0,text='';const decoder=new TextDecoder();
+ try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>max)throw Error('Response too large');text+=decoder.decode(value,{stream:true})}return text+decoder.decode()}finally{await reader.cancel().catch(()=>{})}
+}
+function embedded(html,id){
+ const pattern=new RegExp('<script\\b(?=[^>]*\\bid=["\\\']'+id+'["\\\'])[^>]*>([\\s\\S]*?)</script>','i');const match=html.match(pattern);if(!match)return null;try{return JSON.parse(match[1])}catch{return null}
+}
+export function publicProfile(platform,html,name){
+ if(platform==='tiktok'){
+  const data=embedded(html,'__UNIVERSAL_DATA_FOR_REHYDRATION__');const scope=data?.__DEFAULT_SCOPE__?.['webapp.user-detail'];
+  const user=scope?.userInfo?.user;
+  return scope?.statusCode===0&&typeof user?.uniqueId==='string'&&user.uniqueId.toLowerCase()===name&&/^\d+$/.test(user.id||'');
+ }
+ if(platform==='snapchat'){
+  const data=embedded(html,'__NEXT_DATA__');const envelope=data?.props?.pageProps?.userProfile;
+  const profile=envelope?.$case==='userInfo'?envelope.userInfo:null;
+  // Fail closed if the public page schema changes. Display names and echoed URLs are not evidence.
+  return typeof profile?.username==='string'&&profile.username.toLowerCase()===name&&typeof profile?.snapcodeImageUrl==='string'&&/^https:\/\/(?:app|www)\.snapchat\.com\//.test(profile.snapcodeImageUrl);
+ }
+ return false;
+}
+function result(platform,name,status,reason,extra={}){return {platform,name,status,reason,checkedAt:new Date().toISOString(),...extra}}
+const missing='No current public profile found. Locks, reservations and moderation blocks cannot be ruled out. Confirm in Minecraft before claiming.';
+export function parseMinecraft(names,profiles){
+ if(!Array.isArray(profiles)||profiles.length>names.length)throw Error('Unexpected profile response');const found=new Set();
+ for(const p of profiles){const name=typeof p?.name==='string'?p.name.toLowerCase():'';if(!names.includes(name)||!uuid.test(p?.id||'')||found.has(name))throw Error('Invalid profile response');found.add(name)}
+ return names.map(name=>found.has(name)?result('minecraft',name,'Taken','A matching Java profile exists.',{source:'Mojang public profile registry'}):result('minecraft',name,'Unknown',missing,{code:'unresolved',source:'Mojang public profile registry'}));
+}
+export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=delay,restrictions=[]}={}){
+ const gates=Object.fromEntries(['minecraft','tiktok','snapchat'].map(p=>[p,new Gate(intervals[p]??(p==='minecraft'?1000:2000),now,wait)]));
+ const cache=new Map();const circuits=new Map();
+ // Optional operator evidence, never inferred from missing profiles. No names ship on this list.
+ const evidence=new Map();for(const r of restrictions){if(PLATFORMS[r.platform]&&typeof r.name==='string'&&typeof r.reason==='string'&&r.reason.length&&/^https:\/\//.test(r.source||'')&&Number.isFinite(Date.parse(r.confirmedAt))&&Date.parse(r.confirmedAt)<=now()&&Date.parse(r.expiresAt)>now()&&Date.parse(r.expiresAt)-Date.parse(r.confirmedAt)<=86400000)evidence.set(r.platform+':'+normalize(r.name),r)}
+ async function upstream(platform,names,signal,notice){
+  const gate=gates[platform];const circuit=circuits.get(platform);if(circuit&&circuit.until>now())return names.map(n=>result(platform,n,'Unknown',circuit.reason,{code:circuit.code,retryAt:new Date(circuit.until).toISOString(),retryable:true}));
+  const url=platform==='minecraft'?'https://api.mojang.com/minecraft/profile/lookup/bulk/byname':platform==='tiktok'?'https://www.tiktok.com/@'+encodeURIComponent(names[0]):'https://www.snapchat.com/@'+encodeURIComponent(names[0]);
+  for(let attempt=0;attempt<3;attempt++){
+   await gate.enter(signal);signal.throwIfAborted();
+   try{
+    const timeout=AbortSignal.timeout(10000),combined=AbortSignal.any([signal,timeout]);
+    const response=await fetchImpl(url,{method:platform==='minecraft'?'POST':'GET',headers:{Accept:platform==='minecraft'?'application/json':'text/html','User-Agent':'FourName/2.0 public-profile-checker',...(platform==='minecraft'?{'Content-Type':'application/json'}:{})},...(platform==='minecraft'?{body:JSON.stringify(names)}:{}),redirect:'error',signal:combined});
+    if(response.status===429){
+     const cooldown=Math.max(retryAfter(response.headers.get('Retry-After'),now()),1000*2**attempt);gate.throttle(cooldown);await response.body?.cancel();await notice?.({type:'notice',platform,message:'Rate limited. Respecting the platform’s retry window.',retryAt:new Date(gate.cooldown).toISOString()});
+     // Never shorten Retry-After. Long windows return retryable results instead of tying up a run.
+     if(cooldown<=10000&&attempt<2)continue;
+     circuits.set(platform,{until:gate.cooldown,reason:'Rate limited. Retry after the platform cooldown.',code:'throttled'});
+     return names.map(n=>result(platform,n,'Unknown','Rate limited. Retry after the platform cooldown.',{code:'throttled',retryable:true,retryAt:new Date(gate.cooldown).toISOString()}));
+    }
+    if(response.status===401||response.status===403){await response.body?.cancel();const reason='Unable to verify: platform access is restricted. No authentication or challenge bypass attempted.';circuits.set(platform,{until:now()+300000,reason,code:'blocked'});return names.map(n=>result(platform,n,'Unknown',reason,{code:'blocked',retryable:true,retryAt:new Date(now()+300000).toISOString()}))}
+    if(platform==='minecraft'){
+     if(!response.ok){await response.body?.cancel();throw Error('Upstream HTTP '+response.status)}
+     return parseMinecraft(names,JSON.parse(await readBounded(response,65536)));
+    }
+    if(response.status===404){await response.body?.cancel();return names.map(n=>result(platform,n,'Unknown','Profile not found. This does not prove the username is claimable.',{code:'unresolved'}))}
+    if(!response.ok){await response.body?.cancel();throw Error('Upstream HTTP '+response.status)}
+    const html=await readBounded(response);combined.throwIfAborted();
+    if(publicProfile(platform,html,names[0]))return [result(platform,names[0],'Taken','Exact username found in public profile data.',{source:url})];
+    const reason='Unable to verify: public page did not provide a matching profile. It may be private, a challenge, or a changed page format.';
+    // An opaque/challenge page opens a short circuit; do not hammer thousands of URLs.
+    circuits.set(platform,{until:now()+300000,reason,code:'opaque'});
+    return [result(platform,names[0],'Unknown',reason,{code:'opaque',retryable:true,retryAt:new Date(now()+300000).toISOString()})];
+   }catch(error){signal.throwIfAborted();if(attempt<2){await wait(500*2**attempt+Math.floor(Math.random()*200),undefined,{signal});continue}const reason='Unable to verify: upstream request failed or returned unexpected data.';circuits.set(platform,{until:now()+30000,reason,code:'transient'});return names.map(n=>result(platform,n,'Unknown',reason,{code:'transient',retryable:true,retryAt:new Date(now()+30000).toISOString()}))}
+  }
+ }
+ async function check(platform,names,signal,notice,refresh=false){
+  const rows=[],pending=[];
+  for(const raw of names){const name=normalize(raw),key=platform+':'+name,invalid=validate(platform,name),record=evidence.get(key),hit=cache.get(key);
+   if(invalid)rows.push(result(platform,name,'Invalid',invalid,{code:'format'}));
+   else if(record&&Date.parse(record.expiresAt)>now())rows.push(result(platform,name,'Restricted/Reserved',record.reason,{source:record.source,evidenceConfirmedAt:record.confirmedAt,code:'confirmed-restriction'}));
+   else if(platform==='discord')rows.push(result(platform,name,'Unknown',PLATFORMS.discord.capability,{code:'unsupported'}));
+   else if(platform==='tiktok'&&(name.length<2||name.length>24))rows.push(result(platform,name,'Unknown','Length outside the commonly implemented 2–24 range; verify TikTok’s current rules in the app.',{code:'rules-uncertain'}));
+   else if(hit&&hit.expires>now()&&(!refresh||hit.row.status==='Taken'))rows.push({...hit.row,cached:true});
+   else pending.push(name);
+  }
+  if(pending.length){const fresh=await upstream(platform,pending,signal,notice);for(const row of fresh){if(row.status==='Taken'||row.code==='unresolved'){const key=platform+':'+row.name;cache.delete(key);cache.set(key,{row,expires:now()+(row.status==='Taken'?600000:60000)});if(cache.size>20000)cache.delete(cache.keys().next().value)}rows.push(row)}}
+  return rows;
+ }
+ async function run({names,platforms,refresh=false},signal,emit){
+  const unique=[...new Set(names.map(normalize))];await emit({type:'meta',names:unique.length,total:unique.length*platforms.length,platforms});
+  // Independent platform workers; at most four per search, with globally paced upstream requests.
+  await Promise.all(platforms.map(async platform=>{const size=platform==='minecraft'?10:platform==='discord'?100:1;for(let i=0;i<unique.length;i+=size){signal.throwIfAborted();const rows=await check(platform,unique.slice(i,i+size),signal,notice=>emit(notice),refresh);await emit({type:'results',rows})}}));
+  signal.throwIfAborted();await emit({type:'done'});
+ }
+ return {run,check,gates,cache};
+}
+export const checker=createChecker();

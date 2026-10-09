@@ -1,39 +1,70 @@
-# Validation — 2026-10-08
+# Verification record — 2026-10-09
 
-`npm test`: all 7 test groups passed. Actual HTTP requests covered health, static
-assets, private-path rejection, methods, body limits and lookup response forwarding.
-Lookup tests covered valid profiles, forbidden cross-origin requests, name schema,
-429 handling, blocked endpoints, known-profile GET verification, exact missing
-profile validation, and blocked-bulk cooldown. No failure was accepted as a result.
+## Automated checks completed
 
-The server entry point passed an assigned-PORT startup and health test. The HTML
-JavaScript passed the local HTTP integration harness against this Node server,
-with simulated upstream replies: search, 3–7 slider, 10,000 batch slider, English
-and leetspeak filters, help dialogs, sort, copy, CSV and reset.
+`npm test` passed all 16 tests under Node.js 24.19.0.
 
-No live Render service has been deployed or tested in this session. Local checks
-cannot establish whether Minecraft will accept the eventual Render egress IP.
+- Platform-specific username formats and lengths; case normalization;
+  display-name-like input, legacy Discord tags and consecutive periods.
+- Minecraft exact name/UUID matches; absent, released, locked and reserved
+  **synthetic fixtures** remain Unknown. No fabricated real restricted name
+  is presented as confirmed. Wrong UUIDs, foreign/duplicate profiles and
+  malformed bulk responses fail closed.
+- Explicit sourced restriction evidence is Restricted/Reserved while valid;
+  malformed or expired evidence falls back to Unknown. This verifies trusted
+  operator evidence handling, not automatic discovery of hidden Mojang locks.
+- Exact TikTok/Snapchat profile data confirms Taken; generic HTML, echoed URLs,
+  mismatching usernames and 404s do not. Unsupported Discord availability and
+  disputed TikTok lengths remain Unknown.
+- Cache TTLs and original observation timestamps; transport/5xx/malformed
+  failures never yield availability and do not populate availability cache.
+- Manual Unknown retry refresh with retained Taken cache observations; dynamic
+  cooldown changes rechecked before request admission.
+- Numeric/date Retry-After, short-window bounded retries, long-window cooldown
+  circuit, 401/403 stop behavior, opaque pages, exponential retry backoff.
+- Active upstream cancellation, pacing cancellation and prompt cancellation
+  while waiting behind another request; HTTP disconnect cancels server work.
+- Bounded response bodies, route allowlisting, cross-origin rejection, request
+  validation, limits, NDJSON event order and asset/CSP delivery.
+- Generator deduplication, 2–32-character support, finite search exhaustion,
+  contradictory filters, yielding and cancellation.
+- DOM interaction tests: 2,000 default; slider/exact numeric synchronization;
+  social limit adaptation; 10,000-name run; 50 rendered rows; pagination,
+  status/name filtering, keyboard tabs, safe rendering of script-shaped input,
+  list deduplication and cancel/re-enable behavior.
 
-Client tests: generation ran in a real background thread using the browser worker
-script; worker failures/unavailability fell back to client CPU; abort terminated
-pending generation; WebGPU detection handled usable/missing/rejected adapters.
-HTTP checks also passed for the new worker assets. UI flow verified reset cleared
-cards/count/export/progress, remained available during a scan, and cleared results
-stayed empty after polling and cancellation. Tests used simulated upstream replies.
+The 10,000-name synthetic UI run completed in approximately 106 ms in jsdom on
+one run, with 50 result rows. This measures application/DOM logic, **not browser
+paint performance or live network search speed**. The local-only 10,000-name
+server run took approximately 18 ms on the same run.
 
-One local 10,000-name English-filter benchmark: 1,221 ms before dictionary caching,
-40 ms after caching. This measures CPU filtering only, not Minecraft lookup speed.
+## Live checks completed
 
-UI polish: the HTTP/DOM flow passed pause/resume (checked count remained fixed
-while paused), retained scan state, duplicate-session skipping, new CSV status,
-dark/light toggles, ETA pause state, and reset while running. Lookup/client test
-suite: 7 groups passed. New icons are bundled. Scroll restoration preserved the same visible card position in a geometry-based
-DOM test when an earlier sorted result was inserted. Actual browser scroll
-behavior has not been visually tested.
-No live Render deployment or availability authentication was used.
+Production adapters returned Taken for Notch (Minecraft), `tiktok` (TikTok), and
+`teamsnapchat` (Snapchat). A missing Minecraft candidate returned Unknown.
+The authenticated Minecraft availability endpoint returned HTTP 401 without a
+token. These live observations corroborate positive parsers and the credential
+limitation; they do not prove any absent username is claimable.
 
-Latest regressions: the Reset control no longer uses id="reset", which masks the
-native form reset method. HTTP tests enforce the renamed control. The DOM flow
-passed cancellation and clearing, a single checked-count label, newest-first
-insertion at scroll position zero, and preserving a scrolled card offset when
-a newer result is inserted. Scroll geometry is simulated, not browser visual QA.
+## Browser visual and mobile verification: blocked
+
+A reproducible Playwright suite is included at `test-support/browser.mjs`, but it
+was **not completed** here. The standard Chromium download failed; a Chromium
+package from npm could not launch in the workspace process environment. The
+remote browser rejected the workspace server address with `ERR_BLOCKED_BY_CLIENT`.
+No screenshots or browser performance claims have been fabricated.
+
+Run `npx playwright install chromium` then `npm run test:browser` in a normal
+local environment. The script checks desktop/mobile layouts, horizontal overflow,
+reduced-motion computed styles, browser errors, worker-based generation, 10,000
+results, pagination, filtering, CSV download, keyboard tabs and safe text.
+Browser contrast/layout/accessibility QA should be completed before public launch.
+
+## Scope and remaining limits
+
+This is a working Node application, not a public deployment. Provider HTML schemas
+can change; unrecognized responses remain Unknown. No current unauthenticated
+provider can affirm actual claimability. Hidden Minecraft name locks cannot be
+reliably discovered through the public UUID registry. Discord availability is
+unsupported through its documented public API. Run a single server instance for
+global in-memory rate control; coordinate rates centrally before scaling out.

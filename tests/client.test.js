@@ -1,14 +1,12 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFile} from 'node:fs/promises';import {Worker as NodeWorker} from 'node:worker_threads';import {fileURLToPath} from 'node:url';
-const publicPath=fileURLToPath(new URL('../public/',import.meta.url));
-const html=await readFile(publicPath+'index.html','utf8');const words=JSON.parse(html.match(/const WORDS=new Set\((".*?")\.split\(" "\)\);/)[1]).split(' ');
-const generator=await readFile(publicPath+'generator.js','utf8'),compute=await readFile(publicPath+'client-compute.js','utf8');
-function context(Worker){const ctx=vm.createContext({Worker,WORDS:new Set(words),setTimeout,navigator:{}});vm.runInContext(generator,ctx);vm.runInContext(compute,ctx);return ctx}
-const filters={length:4,chars:'mixed',limit:100,shape:'any',vowels:-1,digits:-1,underscores:-1,first:'any',last:'any',english_only:true,word_leet:true,word_mode:'whole',word_min:3,pattern:'sh4t'};
-class BrowserWorker{
- constructor(){this.worker=new NodeWorker(`const {parentPort}=require('node:worker_threads'),fs=require('node:fs'),vm=require('node:vm');global.self=global;global.importScripts=p=>vm.runInThisContext(fs.readFileSync(${JSON.stringify(publicPath)}+p.slice(1),'utf8'));global.postMessage=m=>parentPort.postMessage(m);vm.runInThisContext(fs.readFileSync(${JSON.stringify(publicPath+'generator-worker.js')},'utf8'));parentPort.on('message',data=>self.onmessage({data}));`,{eval:true});this.worker.on('message',data=>this.onmessage?.({data}));this.worker.on('error',error=>this.onerror?.(error))}
- postMessage(data){this.worker.postMessage(data)}terminate(){this.worker.terminate()}
-}
-test('candidate generation executes in a real background worker',async()=>{const ctx=context(BrowserWorker),names=await ctx.generateOnClient(filters,new AbortController().signal);assert.deepEqual(Array.from(names),['sh4t']);assert.equal(vm.runInContext('clientCapabilities.generation',ctx),'Web Worker')});
-test('unsupported or failed worker falls back to client CPU',async()=>{for(const Worker of [undefined,class{constructor(){throw Error('Worker blocked')}}]){const ctx=context(Worker);assert.deepEqual(Array.from(await ctx.generateOnClient(filters,new AbortController().signal)),['sh4t']);assert.equal(vm.runInContext('clientCapabilities.generation',ctx),'main thread')}});
-test('reset/stop abort terminates pending generation and drops its results',async()=>{let terminated=false;class PendingWorker{postMessage(){}terminate(){terminated=true}}const ctx=context(PendingWorker),controller=new AbortController(),pending=ctx.generateOnClient(filters,controller.signal);controller.abort();assert.deepEqual(Array.from(await pending),[]);assert(terminated)});
-test('GPU availability detection handles missing adapter and rejection',async()=>{for(const adapter of [null,{}]){const ctx=vm.createContext({navigator:{gpu:{requestAdapter:async()=>adapter}},setTimeout});vm.runInContext(compute,ctx);await new Promise(r=>setTimeout(r,0));assert.equal(vm.runInContext('clientCapabilities.webgpu',ctx),adapter?'available':'no adapter')}const ctx=vm.createContext({navigator:{gpu:{requestAdapter:async()=>{throw Error('Unavailable')}}},setTimeout});vm.runInContext(compute,ctx);await new Promise(r=>setTimeout(r,0));assert.equal(vm.runInContext('clientCapabilities.webgpu',ctx),'unavailable')});
+import {test} from 'node:test';import assert from 'node:assert/strict';import {generateCandidates} from '../public/generator.js';
+const base={length:4,chars:'letters',limit:2000,first:'any',last:'any'};
+test('generator defaults, filters, finite spaces and extended platform lengths',async()=>{
+ const names=await generateCandidates(base);assert.equal(names.length,2000);assert.equal(new Set(names).size,2000);assert(names.every(n=>/^[a-z]{4}$/.test(n)));
+ const exact=await generateCandidates({...base,pattern:'nova'});assert.deepEqual(exact,['nova']);assert.deepEqual(await generateCandidates({...base,prefix:'nova',suffix:'x'}),[]);
+ const extended=await generateCandidates({...base,length:32,limit:100});assert.equal(extended.length,100);assert(extended.every(n=>n.length===32));
+ const two=await generateCandidates({...base,length:2,limit:2000});assert.equal(two.length,676);
+ const snap=await generateCandidates({...base,chars:'all',first:'letter',last:'letter'});assert(snap.every(n=>/^[a-z].*[a-z]$/.test(n)));
+});
+test('generator yields and handles cancellation or contradictory filters',async()=>{
+ let checks=0;const names=await generateCandidates({...base,limit:10000},()=>++checks>=1);assert.deepEqual(names,[]);await assert.rejects(generateCandidates({...base,length:33}),/Invalid/);await assert.rejects(generateCandidates({...base,prefix:'a!'}),/letters/);assert.deepEqual(await generateCandidates({...base,allowed:'a',exclude:'a'}),[]);
+});
