@@ -30,17 +30,17 @@
   contradictory filters, yielding and cancellation.
 - Restored pause/resume holds a completed batch and prevents the next batch
   until resumed; per-search control IDs are required.
-- DOM interaction tests: 2,000 default; slider/exact numeric synchronization;
-  social limit adaptation; 10,000-name run; 50 rendered rows; pagination,
-  status/name filtering, keyboard tabs, safe rendering of script-shaped input,
-  list deduplication, cancel/re-enable behavior, theme toggle and original reset.
-  The original stylesheet is preserved as the base, and the logo is restored
-  byte-for-byte from the attachment. Browser visual QA remains blocked as below.
+- Current DOM interaction tests verify Minecraft default selection, exactly one
+  radio selected across every service change, four local real-logo assets,
+  removal of added panels/tabs, original copy-card markup, available-only grid
+  and CSV export, exclusion of every other status, 10,000 synthetic Available
+  **test fixtures** rendered in pages of 50, an honest empty state for unknown
+  results, cancellation, theme toggling and original reset behavior.
+- HTTP tests reject multi-service requests and serve all four SVG assets.
 
-The 10,000-name synthetic UI run completed in approximately 151 ms in jsdom on
-one run, with 50 result rows. This measures application/DOM logic, **not browser
-paint performance or live network search speed**. The local-only 10,000-name
-server run took approximately 24 ms on the same run.
+Synthetic Available fixtures exercise rendering and export only. They are never
+used by production adapters and are not evidence of live claimability. Browser
+painting, visual layout and mobile accessibility remain unverified here.
 
 ## Live checks completed
 
@@ -59,9 +59,8 @@ remote browser rejected the workspace server address with `ERR_BLOCKED_BY_CLIENT
 No screenshots or browser performance claims have been fabricated.
 
 Run `npx playwright install chromium` then `npm run test:browser` in a normal
-local environment. The script checks desktop/mobile layouts, horizontal overflow,
-reduced-motion computed styles, browser errors, worker-based generation, 10,000
-results, pagination, filtering, CSV download, keyboard tabs and safe text.
+local environment. The script checks the original interface, service selection, real icons,
+available-only results, paging, unknown exclusion and desktop/mobile screenshots.
 Browser contrast/layout/accessibility QA should be completed before public launch.
 
 ## Scope and remaining limits

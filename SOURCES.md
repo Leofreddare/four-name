@@ -94,3 +94,18 @@ Node built-ins implement the runtime server and fetch transport. jsdom and
 Playwright are development-only dependencies, with their upstream licenses
 retained in their installed npm packages and pinned in package-lock.json.
 No upstream executable, installer or token-harvesting checker is bundled.
+
+## Service icons added on 2026-10-09
+
+The selection control uses real brand SVG artwork, stored locally:
+
+- Discord, Snapchat and TikTok: Font Awesome Free 6.7.2 Brands, downloaded from
+  https://github.com/FortAwesome/Font-Awesome/tree/6.7.2/svgs/brands
+  SVG attribution comments remain intact. CC BY 4.0 icon license and full
+  attribution are preserved in licenses/FontAwesome.txt.
+- Minecraft: Simple Icons 11.0.0 Minecraft mark, downloaded from
+  https://github.com/simple-icons/simple-icons/blob/11.0.0/icons/minecraft.svg
+  CC0 license is included in licenses/SimpleIcons.txt.
+
+Brand artwork is shown as a monochrome icon to match the original theme, not
+as a fabricated text glyph. No affiliation with any service is implied.

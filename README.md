@@ -47,50 +47,47 @@ locally; matching the character format is not a claimability guarantee. Minecraf
 checks Java profile names, not Bedrock/Xbox gamertags. No display-name availability
 is implied for any platform.
 
-## Search and reliability
+## Interface and checks
 
-- 2,000 names by default. Exact integer input (1–10,000) and a graduated effort
-  slider. TikTok/Snapchat cap the entire selected search at 2,000 names;
-  Minecraft/Discord permit 10,000. Slider values adapt to those limits.
-- Worker-based candidate generation with a yielding fallback. Original prefix,
-  suffix, contains, character exclusion, pattern, style and uniqueness controls
-  are retained; candidate length now follows the selected platforms.
-- Per-run normalized deduplication; shared bounded 20,000-entry cache: Taken for
-  10 minutes and unresolved profile absence for 1 minute. Cache hits show their
-  original observation time. Manual retries refresh Unknown entries, preserving
-  Taken cache hits and respecting all cooldowns.
-- Globally paced requests per process: Minecraft bulk batches of 10, at most one
-  start/second; TikTok/Snapchat at most one start/two seconds per platform. Three
-  simultaneous searches maximum. Independent platform workers stream NDJSON as
-  checks complete. Native Node fetch reuses its connection pool.
-- Ten-second upstream fetch/body deadline, three attempts maximum for transient
-  errors, exponential backoff with jitter. Retry-After seconds and HTTP dates
-  are honored without shortening. Long throttle windows return retryable Unknown
-  results immediately. 401/403 and opaque public pages open a five-minute circuit;
-  exhausted transient failures open a 30-second circuit. No bypass/fallback
-  route is used after an access restriction.
-- Cancellation aborts active fetches, pending pacing/queue waits and generation;
-  a disconnected stream or server shutdown also cancels checks. NDJSON respects
-  backpressure, with small heartbeats for proxies. Configure any reverse proxy
-  to disable response buffering for `/api/check`.
-- Results show name and platform progress, all five status counts, elapsed time,
-  evidence, cached timestamps, cooldown times, search/filter controls, retries,
-  pagination and formula-safe CSV export. Only 50 rows exist in the DOM at once.
-- Original dark/light themes, logo, layout, typography, icon subset, filter guide,
-  word matching, advanced filters, result sorting, copy controls and reset are
-  preserved. Server-backed pause/resume holds results and stops new batches.
-  Session-skip behavior is preserved; unknown results remain explicitly retryable.
-- Native keyboard controls, tab arrow-key navigation, focus indicators, reduced
-  motion, live completion announcements and the original responsive layout.
-  No remote fonts/scripts/analytics.
+The original monochrome dark/light theme, logo, Arial typography, short-name
+filters, help dialog, result-card grid, copy, sort, pause, stop and reset controls
+are preserved. The only new visible control group is the service selector.
+It uses real service brand SVGs and radio buttons: exactly one service at a time,
+with Minecraft selected by default. The API also rejects multi-service requests.
 
-Limits are conservative application limits, not promises of platform quotas.
-Network requests share one limiter per process: **deploy one Node instance** or
-implement a shared limiter/cache before horizontal scaling. A 2,000-name public
-social check can take about 67 minutes; blocked/opaque responses short-circuit the
-remaining verification. More effort expands the candidate pool, not request speed.
-This app sends candidate usernames to selected public platforms and keeps a
-short-lived in-memory result cache. It does not persist searches or credentials.
+The original Names to check slider starts at 2,000. Minecraft and Discord support
+up to 10,000 candidates per run; TikTok and Snapchat cap runs at 2,000. Generation
+keeps the original seven-character maximum; minimum length follows the service.
+The existing advanced filters and offline English-word matching are retained.
+
+**Only affirmatively Available results appear in the original name-card grid or
+CSV export.** Taken, Invalid, Restricted/Reserved and Unknown remain internal
+outcomes and are not displayed as names. No public provider currently emits
+Available, so a public check may show an empty grid and a single "Unable to verify
+availability" message. This is intentional: profile absence is never repackaged
+as availability. Progress counts still include all checked candidates.
+
+There are no added status panels, status filters, per-result badges, evidence
+cards or input-mode tabs. Results remain bounded to 50 cards per page for large
+searches. The cached backend, streaming, timeouts, cooldowns, conservative pacing,
+cancellation and server-backed pause/resume are retained.
+
+Production transport has no third-party runtime dependencies. Native Node fetch
+reuses connections. Minecraft uses batches of ten with at most one request start
+per second; TikTok and Snapchat use at most one start per two seconds. Three
+simultaneous searches maximum, with rates shared globally within one process.
+Taken observations cache for ten minutes; unresolved absence caches for one
+minute. Transient failures never turn into availability results. Fetch/body
+requests time out after ten seconds; transient errors use at most three attempts
+and exponential backoff with jitter. Retry-After windows are never shortened.
+401/403 or opaque pages stop further requests via a short circuit. No bypass is
+attempted. Disconnects and Stop abort active and queued work.
+
+Configure reverse proxies to avoid buffering `/api/check`. Deploy one Node
+instance, or coordinate limits centrally before horizontal scaling. These are
+conservative application limits, not promises of platform quotas. Candidate
+usernames are sent to the selected public platform; no search history or
+credentials are persisted. No public deployment was performed.
 
 ## Optional confirmed restriction evidence
 
