@@ -1,6 +1,5 @@
-MineCraft.ico — grass/dirt block icon by Neo-TheDragon.
-Published May 19, 2011, released to the public domain by its author.
-Source and license: https://www.rw-designer.com/icon-detail/5547
-Download: https://www.rw-designer.com/icon-download.php?id=5547
-Converted from the 256px icon representation to PNG for local web delivery.
-Minecraft is a trademark of Mojang/Microsoft. No affiliation is implied.
+Official Minecraft favicon, downloaded unchanged from Minecraft.net:
+https://www.minecraft.net/etc.clientlibs/minecraftnet/clientlibs/clientlib-site/resources/favicon-96x96.png
+Copyright Mojang AB / Microsoft. Used solely to identify Minecraft.
+Minecraft Usage Guidelines: https://www.minecraft.net/en-us/usage-guidelines
+No affiliation is implied. This asset is not released under the application MIT license.

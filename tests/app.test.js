@@ -1,20 +1,17 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createChecker,parseMinecraft,publicProfile,retryAfter,Gate,readBounded,parseDiscord} from '../lookup.js';
+import {createChecker,parseMinecraft,parseSignup,gitlabRestriction,retryAfter,Gate,readBounded,parseDiscord} from '../lookup.js';
 import {validate,normalize} from '../platforms.js';
 import {createApp,validateJob} from '../server.js';
 const id='069a79f444e94726a5befca90e38aaf5';
 const signal=()=>new AbortController().signal;
 const instant=async()=>{};
-const checker=options=>createChecker({intervals:{minecraft:0,tiktok:0,snapchat:0,discord:0},wait:instant,...options});
-const script=(id,obj)=>'<script id="'+id+'" type="application/json">'+JSON.stringify(obj)+'</script>';
-const tiktok=name=>script('__UNIVERSAL_DATA_FOR_REHYDRATION__',{__DEFAULT_SCOPE__:{'webapp.user-detail':{statusCode:0,userInfo:{user:{uniqueId:name,id:'123456789'}}}}});
-const snapchat=name=>script('__NEXT_DATA__',{props:{pageProps:{userProfile:{$case:'userInfo',userInfo:{username:name,snapcodeImageUrl:'https://app.snapchat.com/scan/test.svg'}}}}});
+const checker=options=>createChecker({intervals:{minecraft:0,gitlab:0,lastfm:0,discord:0},wait:instant,...options});
 test('username format policies, display names, case and platform differences',()=>{
  assert.equal(normalize('  NoTcH '),'notch');assert(validate('minecraft','ab'));assert.equal(validate('minecraft','a'.repeat(16)),null);assert(validate('minecraft','a'.repeat(17)));assert(validate('minecraft','ab.c'));
  assert.equal(validate('discord','.a.b.'),null);assert(validate('discord','a..b'));assert(validate('discord','old#1234'));assert(validate('discord','display name'));assert.equal(validate('discord','a'.repeat(32)),null);
- assert.equal(validate('snapchat','ab-1c'),null);assert(validate('snapchat','a-b_1.c'));assert(validate('snapchat','1abc'));assert(validate('snapchat','abc.'));assert(validate('snapchat','a'.repeat(16)));
- assert.equal(validate('tiktok','a.b_c'),null);assert(validate('tiktok','abc.'));assert(validate('tiktok','name😀'));assert.equal(validate('tiktok','a'),null);
+ assert.equal(validate('lastfm','ab-1c'),null);assert(validate('lastfm','1abc'));assert(validate('lastfm','a.b'));assert(validate('lastfm','a'.repeat(16)));
+ assert.equal(validate('gitlab','a_b'),null);assert(validate('gitlab','_abc'));assert(validate('gitlab','abc.'));assert(validate('gitlab','a.png'));assert.equal(validate('gitlab','a'.repeat(255)),null);assert(validate('gitlab','a'.repeat(256)));
 });
 test('Minecraft missing, released, locked and reserved candidates never become Available',()=>{
  const rows=parseMinecraft(['notch','released_fixture','locked_fixture','reserve_fixture'],[{name:'Notch',id}]);assert.deepEqual(rows.map(r=>r.status),['Taken','Unknown','Unknown','Unknown']);assert(rows.every(r=>r.status!=='Available'));
@@ -25,10 +22,13 @@ test('confirmed restriction evidence is exact, sourced and expiring; invented/ex
  const c=checker({now:()=>time,restrictions:[record,{...record,name:'bad_fixture',source:'not a source'}],fetchImpl:async()=>{calls++;return Response.json([])}});
  let rows=await c.check('minecraft',['locked_fixture','bad_fixture'],signal());assert.equal(rows[0].status,'Restricted/Reserved');assert.equal(rows[1].status,'Unknown');assert.equal(calls,1);time+=11000;rows=await c.check('minecraft',['locked_fixture'],signal());assert.equal(rows[0].status,'Unknown');
 });
-test('social checks require exact structured positive evidence; generic success/echoes are Unknown',async()=>{
- assert.equal(publicProfile('tiktok',tiktok('nova'),'nova'),true);assert.equal(publicProfile('tiktok',tiktok('other'),'nova'),false);assert.equal(publicProfile('tiktok','<title>@nova | TikTok</title>','nova'),false);assert.equal(publicProfile('snapchat',snapchat('nova'),'nova'),true);assert.equal(publicProfile('snapchat',snapchat('other'),'nova'),false);assert.equal(publicProfile('snapchat','<a href="https://www.snapchat.com/add/nova">nova</a>','nova'),false);
- for(const p of ['tiktok','snapchat']){const c=checker({fetchImpl:async()=>new Response(p==='tiktok'?tiktok('nova'):snapchat('nova'))});assert.equal((await c.check(p,['nova'],signal()))[0].status,'Taken');const missing=checker({fetchImpl:async()=>new Response('',{status:404})});assert.equal((await missing.check(p,['nova'],signal()))[0].status,'Unknown')}
- const c=checker({fetchImpl:async()=>Response.json({taken:false})});assert.equal((await c.check('discord',['nova'],signal()))[0].status,'Available');assert.equal((await c.check('discord',['no..va'],signal()))[0].status,'Invalid');assert.equal((await c.check('tiktok',['a'],signal()))[0].code,'rules-uncertain');
+test('signup adapters require explicit affirmative evidence, not profile absence or echoed success messages',async()=>{
+ assert.equal(parseSignup('gitlab','nova',{exists:true}).status,'Taken');assert.equal(parseSignup('gitlab','freshfixture',{exists:false}).status,'Available');
+ assert.equal(parseSignup('lastfm','freshfixture',{userName:{valid:true,success_message:'Ok, that username can be yours!'}}).status,'Available');
+ assert.equal(parseSignup('lastfm','rj',{userName:{valid:false,success_message:'Ok, that username can be yours!',error_messages:["Sorry, this username isn't available."]}}).status,'Taken');
+ for(const data of [{},{exists:'false'},{exists:false,challenge:true}])assert.throws(()=>parseSignup('gitlab','nova',data));
+ for(const data of [{},{userName:{valid:true}},{userName:{valid:false,success_message:'Ok, that username can be yours!'}},{userName:{valid:true,success_message:'Ok, that username can be yours!',error_messages:['challenge']}}])assert.throws(()=>parseSignup('lastfm','nova',data));
+ const c=checker({fetchImpl:async()=>Response.json({exists:false})});assert.equal((await c.check('gitlab',['freshfixture'],signal()))[0].status,'Available');assert.equal((await c.check('gitlab',['help','duo_bot'],signal()))[0].status,'Restricted/Reserved');assert((await c.check('gitlab',['name.unknown','page-abcdef'],signal())).every(r=>r.status==='Unknown'));assert(gitlabRestriction('admin.json'));
 });
 test('caching preserves observed timestamps; transient failures are not availability evidence',async()=>{
  let time=Date.now(),calls=0;const c=checker({now:()=>time,fetchImpl:async()=>{calls++;return Response.json([{name:'notch',id}])}});const a=(await c.check('minecraft',['notch','unknown'],signal()));const b=await c.check('minecraft',['notch','unknown'],signal());assert.equal(calls,1);assert(b.every(r=>r.cached));assert.equal(a[0].checkedAt,b[0].checkedAt);time+=60001;await c.check('minecraft',['unknown'],signal());assert.equal(calls,4); // malformed reply, three attempts
@@ -40,8 +40,7 @@ test('throttling honors numeric/date Retry-After and platform cooldown; no fallb
  let shortCalls=0,time=now;const short=checker({now:()=>time,wait:async ms=>{time+=ms},fetchImpl:async()=>++shortCalls===1?new Response('',{status:429,headers:{'Retry-After':'1'}}):Response.json([])});assert.equal((await short.check('minecraft',['nova'],signal()))[0].status,'Unknown');assert.equal(shortCalls,2);assert(time>=now+1000);
  for(const status of [401,403]){let attempts=0;const blocked=checker({fetchImpl:async()=>{attempts++;return new Response('',{status})}});assert.equal((await blocked.check('minecraft',['notch'],signal()))[0].code,'blocked');await blocked.check('minecraft',['nova'],signal());assert.equal(attempts,1)}
 });
-test('opaque pages open circuit and 5xx/network/malformed failures use bounded backoff',async()=>{
- let calls=0;const c=checker({fetchImpl:async()=>{calls++;return new Response('<html>challenge</html>')}});assert.equal((await c.check('tiktok',['nova'],signal()))[0].code,'opaque');await c.check('tiktok',['other'],signal());assert.equal(calls,1);
+test('5xx/network/malformed failures use bounded backoff and never availability',async()=>{
  for(const response of [()=>new Response('bad',{status:503}),()=>Response.json({}),()=>{throw Error('network')}]){let attempts=0;const waits=[];const c=checker({wait:async ms=>waits.push(ms),fetchImpl:async()=>{attempts++;return response()}});const rows=await c.check('minecraft',['nova'],signal());assert.equal(attempts,3);assert.equal(rows[0].code,'transient');assert.equal(rows[0].status,'Unknown');assert.equal(c.cache.size,0);assert.equal(waits.length,2);assert(waits[1]>waits[0])}
 });
 test('cancellation interrupts active fetch, pacing waits and queued gate admission',async()=>{
@@ -54,9 +53,9 @@ test('streaming run deduplicates names, preserves every status and scales to 10,
  const start=performance.now();let count=0;await c.run({names:Array.from({length:10000},(_,i)=>'name'+i),platforms:['discord']},signal(),async e=>{count+=e.rows?.length||0});assert.equal(count,10000);assert(performance.now()-start<2000);
 });
 test('HTTP serving, request validation, streaming and disconnect cancellation',async()=>{
- assert.throws(()=>validateJob({names:['abc'],platforms:['unknown']}));assert.throws(()=>validateJob({names:['abc'],platforms:['minecraft','discord']}),/exactly one/);assert.throws(()=>validateJob({names:Array.from({length:2001},(_,i)=>'n'+i),platforms:['tiktok']}));assert.deepEqual(validateJob({names:['Nova',' nova '],platforms:['discord']}),{names:['nova'],platforms:['discord']});
+ assert.throws(()=>validateJob({names:['abc'],platforms:['unknown']}));assert.throws(()=>validateJob({names:['abc'],platforms:['minecraft','discord']}),/exactly one/);assert.throws(()=>validateJob({names:Array.from({length:2001},(_,i)=>'n'+i),platforms:['gitlab']}));assert.deepEqual(validateJob({names:['Nova',' nova '],platforms:['discord']}),{names:['nova'],platforms:['discord']});
  let aborted;const cancelled=new Promise(r=>aborted=r);const engine={run:async(job,signal,emit)=>{await emit({type:'meta',names:1,total:1});if(job.names[0]==='cancel'){await new Promise(r=>signal.addEventListener('abort',()=>{aborted();r()},{once:true}));return}await emit({type:'results',rows:[{name:job.names[0],platform:'discord',status:'Unknown'}]});await emit({type:'done'})}};const server=createApp(engine);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
- try{assert.equal((await fetch(base+'/health')).status,200);const response=await fetch(base+'/');assert(response.headers.get('content-security-policy').includes("script-src 'self';"));assert((await response.text()).includes('Four Name'));assert.equal((await fetch(base+'/server.js')).status,404);for(const path of ['/app.js','/platforms.js','/styles.css','/generator-worker.js','/service-icons/minecraft.png','/service-icons/discord.svg','/service-icons/tiktok.svg','/service-icons/snapchat.svg'])assert.equal((await fetch(base+path)).status,200);assert.equal((await fetch(base+'/api/check')).status,405);
+ try{assert.equal((await fetch(base+'/health')).status,200);const response=await fetch(base+'/');assert(response.headers.get('content-security-policy').includes("script-src 'self';"));assert((await response.text()).includes('Four Name'));assert.equal((await fetch(base+'/server.js')).status,404);for(const path of ['/app.js','/platforms.js','/styles.css','/generator-worker.js','/service-icons/minecraft.png','/service-icons/discord.svg','/service-icons/gitlab.svg','/service-icons/lastfm.svg'])assert.equal((await fetch(base+path)).status,200);assert.equal((await fetch(base+'/api/check')).status,405);
  const post=(body,headers={})=>fetch(base+'/api/check',{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body)});
  assert.equal((await post({names:['abc'],platforms:['discord']},{Origin:'https://evil.test'})).status,403);assert.equal((await post({names:['abc'],platforms:['bad']})).status,400);const stream=await post({names:['nova'],platforms:['discord']});assert.equal(stream.status,200);assert.equal(stream.headers.get('content-type'),'application/x-ndjson; charset=utf-8');const lines=(await stream.text()).trim().split('\n').map(JSON.parse);assert.deepEqual(lines.map(e=>e.type),['meta','results','done']);await new Promise(r=>setTimeout(r,1050));const ctrl=new AbortController();const pending=await fetch(base+'/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:['cancel'],platforms:['discord']}),signal:ctrl.signal});const reader=pending.body.getReader();await reader.read();ctrl.abort();await Promise.race([cancelled,new Promise((_,reject)=>setTimeout(()=>reject(Error('disconnect did not cancel')),2000))]);
  }finally{server.cancelSearches();server.closeAllConnections();await new Promise(r=>server.close(r))}
@@ -113,5 +112,15 @@ test('cooldown waits can be cancelled and paused before retry without checking l
 test('blocked searches halt without counting the unrequested tail; unsupported social scans fail immediately',async()=>{
  let calls=0;const c=checker({fetchImpl:async()=>{calls++;return new Response('',{status:403})}}),events=[];
  await c.run({names:['firstfixture','secondfixture','thirdfixture'],platforms:['discord']},signal(),async e=>events.push(e));assert.equal(calls,1);assert.equal(events.flatMap(e=>e.rows||[]).length,0);assert.equal(events.at(-1).type,'error');assert(!events.some(e=>e.type==='done'));
- for(const p of ['tiktok','snapchat']){const events=[];await c.run({names:['firstfixture','secondfixture'],platforms:[p]},signal(),async e=>events.push(e));assert.equal(calls,1);assert.equal(events.at(-1).type,'error');assert(events.at(-1).message.includes('No names were checked'))}
+ assert.throws(()=>validateJob({names:['nova'],platforms:['tiktok']}));assert.throws(()=>validateJob({names:['nova'],platforms:['snapchat']}));
+});
+
+test('Last.fm anonymous session reuse, token submission, caching and session failure handling',async()=>{
+ let joins=0,checks=0;const c=checker({fetchImpl:async(url,options)=>{
+  if(url.endsWith('/join')){joins++;assert(!options.headers.Authorization);return new Response('<html>Signup</html>',{headers:{'Set-Cookie':'csrftoken=testtoken; Secure; Path=/'}})}
+  checks++;assert.equal(options.headers.Cookie,'csrftoken=testtoken');assert.equal(options.method,'POST');const body=new URLSearchParams(options.body);assert.equal(body.get('csrfmiddlewaretoken'),'testtoken');assert.equal(body.get('email'),'');assert(!body.has('password'));return Response.json({userName:{valid:true,success_message:'Ok, that username can be yours!'}})
+ }});
+ assert.equal((await c.check('lastfm',['firstfixture','secondfixture'],signal())).length,2);assert.equal(joins,1);assert.equal(checks,2);await c.check('lastfm',['firstfixture'],signal());assert.equal(checks,2);await c.check('lastfm',['firstfixture'],signal(),null,true);assert.equal(checks,3);
+ const blocked=checker({fetchImpl:async()=>new Response('',{status:403})});assert.equal((await blocked.check('lastfm',['firstfixture'],signal()))[0].code,'blocked');
+ const missingToken=checker({fetchImpl:async()=>new Response('<html>Challenge</html>')});assert.equal((await missingToken.check('lastfm',['firstfixture'],signal()))[0].code,'transient');
 });

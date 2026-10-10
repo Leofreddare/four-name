@@ -23,23 +23,6 @@ export async function readBounded(response,max=2*1024*1024){
  const reader=response.body?.getReader();if(!reader)return '';let size=0,text='';const decoder=new TextDecoder();
  try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>max)throw Error('Response too large');text+=decoder.decode(value,{stream:true})}return text+decoder.decode()}finally{await reader.cancel().catch(()=>{})}
 }
-function embedded(html,id){
- const pattern=new RegExp('<script\\b(?=[^>]*\\bid=["\\\']'+id+'["\\\'])[^>]*>([\\s\\S]*?)</script>','i');const match=html.match(pattern);if(!match)return null;try{return JSON.parse(match[1])}catch{return null}
-}
-export function publicProfile(platform,html,name){
- if(platform==='tiktok'){
-  const data=embedded(html,'__UNIVERSAL_DATA_FOR_REHYDRATION__');const scope=data?.__DEFAULT_SCOPE__?.['webapp.user-detail'];
-  const user=scope?.userInfo?.user;
-  return scope?.statusCode===0&&typeof user?.uniqueId==='string'&&user.uniqueId.toLowerCase()===name&&/^\d+$/.test(user.id||'');
- }
- if(platform==='snapchat'){
-  const data=embedded(html,'__NEXT_DATA__');const envelope=data?.props?.pageProps?.userProfile;
-  const profile=envelope?.$case==='userInfo'?envelope.userInfo:null;
-  // Fail closed if the public page schema changes. Display names and echoed URLs are not evidence.
-  return typeof profile?.username==='string'&&profile.username.toLowerCase()===name&&typeof profile?.snapcodeImageUrl==='string'&&/^https:\/\/(?:app|www)\.snapchat\.com\//.test(profile.snapcodeImageUrl);
- }
- return false;
-}
 function result(platform,name,status,reason,extra={}){return {platform,name,status,reason,checkedAt:new Date().toISOString(),...extra}}
 const missing='No current public profile found. Locks, reservations and moderation blocks cannot be ruled out. Confirm in Minecraft before claiming.';
 export function parseMinecraft(names,profiles){
@@ -62,20 +45,43 @@ export function parseDiscord(name,status,data){
  }
  throw Error('Unexpected Discord signup response');
 }
+const gitlabReserved=new Set(['admin','api','assets','dashboard','explore','groups','health_check','help','import','jwt','login','o','oauth','profile','projects','public','s','search','sitemap','snippets','unsubscribes','uploads','users','v2']);
+export function gitlabRestriction(name){return gitlabReserved.has(name)||/^(?:duo[-_]|ai[-_])/.test(name)||/^(?:admin|dashboard|explore|groups|health_check|help|projects|public|search)\./.test(name)}
+export function parseSignup(platform,name,data){
+ if(platform==='gitlab'&&data&&Object.keys(data).length===1&&typeof data.exists==='boolean')return result(platform,name,data.exists?'Taken':'Available',data.exists?'GitLab reports this namespace is occupied or reserved.':'GitLab’s signup namespace check reports this name unused; local reservation rules passed. Confirm at signup before claiming.',{code:'signup-check',source:'GitLab public signup namespace check'});
+ if(platform==='lastfm'){
+  const field=data?.userName;
+  if(field?.valid===true&&field.success_message==='Ok, that username can be yours!'&&(!field.error_messages||field.error_messages.length===0))return result(platform,name,'Available','Last.fm’s signup validator explicitly accepted this username. Confirm at signup before claiming.',{code:'signup-check',source:'Last.fm public signup validator'});
+  if(field?.valid===false&&Array.isArray(field.error_messages)&&field.error_messages.length===1&&field.error_messages[0]==="Sorry, this username isn't available.")return result(platform,name,'Taken','Last.fm reports this username unavailable (taken or reserved).',{code:'signup-check',source:'Last.fm public signup validator'});
+ }
+ throw Error('Unexpected signup validation response');
+}
 export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=delay,restrictions=[]}={}){
- const gates=Object.fromEntries(['minecraft','tiktok','snapchat','discord'].map(p=>[p,new Gate(intervals[p]??(p==='minecraft'?1000:p==='discord'?5000:2000),now,wait)]));
- const cache=new Map();const circuits=new Map();
+ const gates=Object.fromEntries(['minecraft','gitlab','lastfm','discord'].map(p=>[p,new Gate(intervals[p]??(p==='minecraft'?1000:p==='discord'?5000:2000),now,wait)]));
+ const cache=new Map();const circuits=new Map();let lastfmSession=null,lastfmPending=null;
+ async function session(signal,gate){
+  if(lastfmSession?.until>now())return lastfmSession;
+  if(lastfmPending)return lastfmPending;
+  lastfmPending=(async()=>{const response=await fetchImpl('https://www.last.fm/join',{headers:{'User-Agent':'FourName/2.0 username-checker','Accept-Language':'en-US'},redirect:'error',signal});
+   if(!response.ok){await response.body?.cancel();const error=Error('Signup session unavailable');if([401,403].includes(response.status))error.code='blocked';if(response.status===429){error.code='throttled';error.until=now()+retryAfter(response.headers.get('Retry-After'),now());gate.throttle(error.until-now())}throw error}
+   const cookies=response.headers.getSetCookie?.()||[];const token=cookies.map(c=>c.match(/^csrftoken=([^;]+)/)?.[1]).find(Boolean);await readBounded(response);signal.throwIfAborted();if(!token||! /^[a-zA-Z0-9]+$/.test(token))throw Error('Missing anonymous signup CSRF token');lastfmSession={token,until:now()+600000};return lastfmSession})();
+  try{return await lastfmPending}finally{lastfmPending=null}
+ }
+
  // Optional operator evidence, never inferred from missing profiles. No names ship on this list.
  const evidence=new Map();for(const r of restrictions){if(PLATFORMS[r.platform]&&typeof r.name==='string'&&typeof r.reason==='string'&&r.reason.length&&/^https:\/\//.test(r.source||'')&&Number.isFinite(Date.parse(r.confirmedAt))&&Date.parse(r.confirmedAt)<=now()&&Date.parse(r.expiresAt)>now()&&Date.parse(r.expiresAt)-Date.parse(r.confirmedAt)<=86400000)evidence.set(r.platform+':'+normalize(r.name),r)}
  async function upstream(platform,names,signal,notice){
   const gate=gates[platform];const circuit=circuits.get(platform);if(circuit&&circuit.until>now())return names.map(n=>result(platform,n,'Unknown',circuit.reason,{code:circuit.code,retryAt:new Date(circuit.until).toISOString(),retryable:true}));
-  const url=platform==='discord'?'https://discord.com/api/v9/unique-username/username-attempt-unauthed':platform==='minecraft'?'https://api.mojang.com/minecraft/profile/lookup/bulk/byname':platform==='tiktok'?'https://www.tiktok.com/@'+encodeURIComponent(names[0]):'https://www.snapchat.com/@'+encodeURIComponent(names[0]);
+  const url=platform==='discord'?'https://discord.com/api/v9/unique-username/username-attempt-unauthed':platform==='minecraft'?'https://api.mojang.com/minecraft/profile/lookup/bulk/byname':platform==='gitlab'?'https://gitlab.com/users/'+encodeURIComponent(names[0])+'/exists':'https://www.last.fm/join/partial/validate';
   for(let attempt=0;attempt<3;attempt++){
    await gate.enter(signal);signal.throwIfAborted();
    try{
-    const timeout=AbortSignal.timeout(10000),combined=AbortSignal.any([signal,timeout]);
-    const json=platform==='minecraft'||platform==='discord';
-    const response=await fetchImpl(url,{method:json?'POST':'GET',headers:{Accept:json?'application/json':'text/html','User-Agent':'FourName/2.0 public-username-checker',...(json?{'Content-Type':'application/json'}:{})},...(json?{body:JSON.stringify(platform==='discord'?{username:names[0]}:names)}:{}),redirect:'error',signal:combined});
+    let csrf;
+    if(platform==='lastfm'){const hadSession=lastfmSession?.until>now();csrf=await session(AbortSignal.any([signal,AbortSignal.timeout(10000)]),gate);if(!hadSession)await gate.enter(signal)}
+    const combined=AbortSignal.any([signal,AbortSignal.timeout(10000)]),json=platform==='minecraft'||platform==='discord';
+    const headers={Accept:'application/json','User-Agent':'FourName/2.0 username-checker','Accept-Language':'en-US',...(json?{'Content-Type':'application/json'}:{}),...(platform==='gitlab'?{'X-Requested-With':'XMLHttpRequest'}:{}),...(platform==='lastfm'?{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest',Referer:'https://www.last.fm/join',Cookie:'csrftoken='+csrf.token}:{})};
+    const body=json?JSON.stringify(platform==='discord'?{username:names[0]}:names):platform==='lastfm'?new URLSearchParams({csrfmiddlewaretoken:csrf.token,userName:names[0],email:''}).toString():undefined;
+    const response=await fetchImpl(url,{method:body?'POST':'GET',headers,...(body?{body}:{}),redirect:'error',signal:combined});
     if(response.status===429){
      const header=response.headers.get('Retry-After');let cooldown=header?retryAfter(header,now()):null;
      if(platform==='discord'){try{const data=JSON.parse(await readBounded(response,65536));if(typeof data.retry_after==='number'&&Number.isFinite(data.retry_after)&&data.retry_after>=0)cooldown=Math.max(cooldown??0,retryAfter(String(data.retry_after),now()))}catch{}gate.interval=Math.min(60000,Math.max(gate.interval,5000)*1.5)}
@@ -95,15 +101,9 @@ export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=de
      if(!response.ok){await response.body?.cancel();throw Error('Upstream HTTP '+response.status)}
      return parseMinecraft(names,JSON.parse(await readBounded(response,65536)));
     }
-    if(response.status===404){await response.body?.cancel();return names.map(n=>result(platform,n,'Unknown','Profile not found. This does not prove the username is claimable.',{code:'unresolved'}))}
     if(!response.ok){await response.body?.cancel();throw Error('Upstream HTTP '+response.status)}
-    const html=await readBounded(response);combined.throwIfAborted();
-    if(publicProfile(platform,html,names[0]))return [result(platform,names[0],'Taken','Exact username found in public profile data.',{source:url})];
-    const reason='Unable to verify: public page did not provide a matching profile. It may be private, a challenge, or a changed page format.';
-    // An opaque/challenge page opens a short circuit; do not hammer thousands of URLs.
-    circuits.set(platform,{until:now()+300000,reason,code:'opaque'});
-    return [result(platform,names[0],'Unknown',reason,{code:'opaque',retryable:true,retryAt:new Date(now()+300000).toISOString()})];
-   }catch(error){signal.throwIfAborted();if(attempt<2){await wait(500*2**attempt+Math.floor(Math.random()*200),undefined,{signal});continue}const reason='Unable to verify: upstream request failed or returned unexpected data.';circuits.set(platform,{until:now()+30000,reason,code:'transient'});return names.map(n=>result(platform,n,'Unknown',reason,{code:'transient',retryable:true,retryAt:new Date(now()+30000).toISOString()}))}
+    const data=JSON.parse(await readBounded(response,65536));combined.throwIfAborted();return [parseSignup(platform,names[0],data)];
+   }catch(error){signal.throwIfAborted();if(error.code==='blocked'||error.code==='throttled'){const until=error.until||now()+300000,reason=error.code==='throttled'?'Rate limited. Retry after the platform cooldown.':'Unable to verify: signup access is restricted.';circuits.set(platform,{until,reason,code:error.code});return names.map(n=>result(platform,n,'Unknown',reason,{code:error.code,retryable:true,retryAt:new Date(until).toISOString()}))}if(attempt<2){await wait(500*2**attempt+Math.floor(Math.random()*200),undefined,{signal});continue}const reason='Unable to verify: upstream request failed or returned unexpected data.';circuits.set(platform,{until:now()+30000,reason,code:'transient'});return names.map(n=>result(platform,n,'Unknown',reason,{code:'transient',retryable:true,retryAt:new Date(now()+30000).toISOString()}))}
   }
  }
  async function check(platform,names,signal,notice,refresh=false){
@@ -111,7 +111,8 @@ export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=de
   for(const raw of names){const name=normalize(raw),key=platform+':'+name,invalid=validate(platform,name),record=evidence.get(key),hit=cache.get(key);
    if(invalid)rows.push(result(platform,name,'Invalid',invalid,{code:'format'}));
    else if(record&&Date.parse(record.expiresAt)>now())rows.push(result(platform,name,'Restricted/Reserved',record.reason,{source:record.source,evidenceConfirmedAt:record.confirmedAt,code:'confirmed-restriction'}));
-   else if(platform==='tiktok'&&(name.length<2||name.length>24))rows.push(result(platform,name,'Unknown','Length outside the commonly implemented 2–24 range; verify TikTok’s current rules in the app.',{code:'rules-uncertain'}));
+   else if(platform==='gitlab'&&gitlabRestriction(name))rows.push(result(platform,name,'Restricted/Reserved','GitLab reserves this route or AI username prefix.',{code:'platform-restriction',source:'GitLab official username policy/source'}));
+   else if(platform==='gitlab'&&(name.includes('.')||name.includes('-')))rows.push(result(platform,name,'Unknown','Namespace checks cannot exclude reserved suffixes or hidden GitLab Pages domains for this name.',{code:'rules-uncertain'}));
    else if(hit&&hit.expires>now()&&(!refresh||hit.row.status==='Taken'))rows.push({...hit.row,cached:true});
    else pending.push(name);
   }

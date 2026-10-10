@@ -2,7 +2,7 @@
 // Does not test name claiming and does not request or accept credentials.
 import {createChecker} from '../lookup.js';
 const checker=createChecker();
-for(const [platform,names] of [['discord',['nova']],['discord',['fncheck8x9p2']],['discord',['discordtest']],['minecraft',['notch','qzxv739']],['tiktok',['tiktok']],['snapchat',['teamsnapchat']]]){
+for(const [platform,names] of [['discord',['nova']],['discord',['fncheck8x9p2']],['discord',['discordtest']],['minecraft',['notch','qzxv739']],['gitlab',['root','fncheck8x9p2','help']],['lastfm',['rj','fncheck8x9p2']]]){
  console.log(JSON.stringify(await checker.check(platform,names,new AbortController().signal),null,2));
 }
 const response=await fetch('https://api.minecraftservices.com/minecraft/profile/name/qzxv739/available',{signal:AbortSignal.timeout(10000)});

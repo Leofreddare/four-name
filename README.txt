@@ -1,11 +1,8 @@
-Four Name 2.0 — original theme
+Four Name — original theme
 
-Run: npm ci, then npm start. Open http://localhost:3000.
-Run automated checks: npm test.
-
-The full implementation, platform limitations, deployment notes and evidence
-configuration are documented in README.md. Research is in SOURCES.md, and the
-verification record is in TESTING.md.
-
-No public profile absence is labeled Available. Discord uses its unauthenticated signup username check. TikTok and Snapchat
-cannot currently verify claimability publicly. No credentials are collected.
+Run npm ci, then npm start. Open http://localhost:3000.
+Current services: Minecraft Java, GitLab, Last.fm and Discord.
+TikTok/Snapchat have been replaced. Restart the server after replacing files.
+No credentials required. Only verified Available results appear in the grid.
+Minecraft public lookup cannot verify claimability of missing profiles.
+See README.md, SOURCES.md and TESTING.md for details.
