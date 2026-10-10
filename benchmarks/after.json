@@ -1,0 +1,52 @@
+{
+  "generation10000ms": [
+    15.769480999999999,
+    7.275283999999999,
+    5.469883999999993,
+    4.374601999999996,
+    5.362943000000001
+  ],
+  "generationMedianBefore": 42.71259400000001,
+  "generationMedianAfter": 5.469883999999993,
+  "initialScriptAndDocumentBytesBefore": 105397,
+  "initialScriptAndDocumentWireBytesAfter": 22245,
+  "transferReduction": 4.7380085412452235,
+  "files": {
+    "index.html": {
+      "bytes": 42086,
+      "br": 8338
+    },
+    "styles.css": {
+      "bytes": 14610,
+      "br": 3621
+    },
+    "app.js": {
+      "bytes": 28184,
+      "br": 9329
+    },
+    "platforms.js": {
+      "bytes": 2210,
+      "br": 957
+    }
+  },
+  "warmCache10000msBefore": [
+    21.449866999999998,
+    14.322876000000008,
+    14.731502000000006,
+    13.134274000000005,
+    12.230913000000015
+  ],
+  "warmCache10000msAfter": [
+    13.379960000000011,
+    10.716531000000003,
+    10.621227000000005,
+    9.49377800000002,
+    10.356587999999988
+  ],
+  "warmCacheSpeedup": 1.348514253579177,
+  "syntheticMinecraft40NamesMs": {
+    "serial": 106.28379100000001,
+    "pipelined": 55.51505400000002
+  },
+  "note": "Local Node measurements; cache and adapter fixtures are synthetic. Initial byte comparison excludes icons, measures previously uncompressed eagerly loaded document/CSS/module graph versus compressed now-eager graph. Not a browser paint or live network speed benchmark."
+}

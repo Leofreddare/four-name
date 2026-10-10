@@ -53,3 +53,7 @@ failed previously, npm Chromium could not launch, and the remote browser rejecte
 the workspace server URL. The optional Playwright suite is included for running
 in a normal local environment. No fabricated screenshots or browser performance
 claims are presented. No public deployment was performed.
+
+2026-10-10: 31 tests pass after the optional-service settings, streamed exhaustive traversal, shared word matcher, static compression/ETag cache, cache batching, two-request Minecraft pipeline and worker integration changes. `tests/improvements.test.js` verifies the full small-space product across budgets, BigInt cursor boundaries, positional/boundary English matching, service-compatible character sets, static HEAD/304 responses, cache chunking, worker secret/schema/batch constraints and overlapping Minecraft requests under one gate. `benchmarks/dom.json` measures synthetic JSDOM interactions and 10,000-result handling; it is not a browser paint benchmark. Raw before/after data in `benchmarks/` preserve the measured evidence and caveats.
+
+Current live probes successfully checked all four service adapters. Playwright remains blocked because Chromium is not installed; no visual screenshot or deployed-worker verification was performed. Worker test fixtures never enter production availability output.

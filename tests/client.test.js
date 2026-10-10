@@ -8,5 +8,5 @@ test('generator defaults, filters, finite spaces and extended platform lengths',
  const snap=await generateCandidates({...base,chars:'all',first:'letter',last:'letter'});assert(snap.every(n=>/^[a-z].*[a-z]$/.test(n)));
 });
 test('generator yields and handles cancellation or contradictory filters',async()=>{
- let checks=0;const names=await generateCandidates({...base,limit:10000},()=>++checks>=1);assert.deepEqual(names,[]);await assert.rejects(generateCandidates({...base,length:33}),/Invalid/);await assert.rejects(generateCandidates({...base,prefix:'a!'}),/letters/);assert.deepEqual(await generateCandidates({...base,allowed:'a',exclude:'a'}),[]);
+ let checks=0;const names=await generateCandidates({...base,limit:10000},()=>++checks>=1);assert.deepEqual(names,[]);await assert.rejects(generateCandidates({...base,length:256}),/Invalid/);await assert.rejects(generateCandidates({...base,prefix:'a!'}),/letters/);assert.deepEqual(await generateCandidates({...base,allowed:'a',exclude:'a'}),[]);
 });

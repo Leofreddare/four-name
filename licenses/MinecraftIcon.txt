@@ -1,5 +1,3 @@
-Official Minecraft favicon, downloaded unchanged from Minecraft.net:
-https://www.minecraft.net/etc.clientlibs/minecraftnet/clientlibs/clientlib-site/resources/favicon-96x96.png
-Copyright Mojang AB / Microsoft. Used solely to identify Minecraft.
-Minecraft Usage Guidelines: https://www.minecraft.net/en-us/usage-guidelines
-No affiliation is implied. This asset is not released under the application MIT license.
+Minecraft service image supplied by the user in upload/minecraft.png.
+The display copy is resized to 36 × 36 pixels (18 CSS pixels at 2× resolution).
+This asset is not covered by the application MIT license. No affiliation is implied.

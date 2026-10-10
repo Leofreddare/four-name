@@ -1,0 +1,11 @@
+// The common vocabulary is a deliberately conservative, curated subset of the bundled list.
+export const COMMON=new Set('air ant apple arm art ash axe baby back bag ball bank bar bat bear bed bee bell bird blue boat book boot box boy bread bus cake call camp car card care cat cave city cloud coast code cold color cool corn cow cup cut dark day deer desk dog door down dream dry duck dust earth east easy egg eye face farm fast fat fear feel field fire fish five flag flat fly food foot fork four fox free frog fruit game gate gift girl glass gold good grass gray green grow hand hard hat head heat help hen high hill home hope horse hot hour house ice ink iron jam job joy jump key king kite knee lake lamp land last leaf leg lemon life light lime line lion list live lock log long look love low luck mail make map mark mask milk moon mouse mouth move mud name near neck nest new night nine north nose note oak ocean oil old one orange owl page pair park path pear pen pet pie pig pink play pond pool rain read red rice ring river road rock roof room rose round run rush sad safe sail salt sand sea seed seven shade sheep shell ship shoe shop short show side six sky slow small smile snow soft song soul south star stay step stone stop storm street sun sweet swim tail take tall tea team ten tent three time tiny toe town toy tree trip true two up use warm water wave way west wet white wild wind wing wish wolf wood word work world yard year yellow yes zero'.split(' '));
+export function createWordMatcher(f,vocabulary){
+ const words=new Set([...(f.word_vocab==='common'?COMMON:vocabulary),...(f.word_custom||'').toLowerCase().split(/[,\s]+/).filter(Boolean)]),min=Number(f.word_min)||3;
+ const leet={'0':'o','1':'i','3':'e','4':'a','5':'s','7':'t','8':'b','9':'g'};
+ return name=>{const versions=[name.toLowerCase()];if(f.word_leet)versions.push([...versions[0]].map(c=>leet[c]||c).join(''));
+ return versions.some(text=>{for(let start=0;start<=text.length-min;start++)for(let end=start+min;end<=Math.min(text.length,start+32);end++){
+ if(f.word_mode==='whole'&&(start||end!==text.length)||f.word_mode==='start'&&start||f.word_mode==='end'&&end!==text.length)continue;
+ if(f.word_boundary==='word'&&((start&&/[a-z]/.test(text[start-1]))||(end<text.length&&/[a-z]/.test(text[end]))))continue;
+ if(words.has(text.slice(start,end)))return true}return false})};
+}

@@ -115,3 +115,14 @@ Playwright are development-only dependencies, with their upstream licenses
 retained in their installed npm packages and pinned in package-lock.json.
 No upstream executable, installer or token-harvesting checker is bundled.
 
+
+## 2026-10-10 updates
+
+- User-supplied `upload/minecraft.png` resized to 36px for 18px display; separate asset notice updated.
+- [GitLab non-configurable limits](https://docs.gitlab.com/rate_limits/non_configurable/): username-exists 20/minute/IP; use 3.1-second pacing, plus response-driven backoff.
+- [Discord rate-limit documentation](https://docs.discord.com/developers/topics/rate-limits): interpret route headers and Retry-After; do not hardcode a guaranteed throughput for the internal signup validator.
+- [Cloudflare Workers limits](https://developers.cloudflare.com/workers/platform/limits/) and [pricing](https://developers.cloudflare.com/workers/platform/pricing/): 100,000/day, 10ms CPU, 50 external subrequests/invocation on Free.
+- [SQLite Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/): 100,000/day, 13,000 GB-s/day, SQLite-only Free support; one shared checker coordinator.
+- [Render free services](https://render.com/docs/free): 750 hours/workspace/month; 15-minute idle sleep, approximately one-minute wake-up; single instance and outgoing-traffic constraints.
+- Dictionary uses the original bundled 2,278-word list with a newly curated 273-word common subset; no third-party word corpus was copied. Generation/matching improvements are independently implemented.
+- Current small live probes confirmed signup validators' explicit positive/negative evidence; Minecraft authenticated availability remained 401 unauthenticated. No account creation, tokens, platform logins or challenge bypasses.

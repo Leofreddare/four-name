@@ -1,4 +1,4 @@
-import {setTimeout as delay} from 'node:timers/promises';
+function delay(ms,value,{signal}={}){return new Promise((resolve,reject)=>{const abort=()=>{clearTimeout(timer);reject(signal.reason)},timer=setTimeout(()=>{signal?.removeEventListener('abort',abort);resolve(value)},ms);if(signal){if(signal.aborted)abort();else signal.addEventListener('abort',abort,{once:true})}})}
 import {PLATFORMS,normalize,validate} from './platforms.js';
 const uuid=/^[a-f0-9]{32}$/i;
 export function retryAfter(value,now=Date.now()){
@@ -57,14 +57,14 @@ export function parseSignup(platform,name,data){
  throw Error('Unexpected signup validation response');
 }
 export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=delay,restrictions=[]}={}){
- const gates=Object.fromEntries(['minecraft','gitlab','lastfm','discord'].map(p=>[p,new Gate(intervals[p]??(p==='minecraft'?1000:p==='discord'?5000:2000),now,wait)]));
+ const gates=Object.fromEntries(['minecraft','gitlab','lastfm','discord'].map(p=>[p,new Gate(intervals[p]??(p==='minecraft'?1000:p==='discord'?5000:p==='gitlab'?3100:2000),now,wait)]));
  const cache=new Map();const circuits=new Map();let lastfmSession=null,lastfmPending=null;
  async function session(signal,gate){
   if(lastfmSession?.until>now())return lastfmSession;
   if(lastfmPending)return lastfmPending;
   lastfmPending=(async()=>{const response=await fetchImpl('https://www.last.fm/join',{headers:{'User-Agent':'FourName/2.0 username-checker','Accept-Language':'en-US'},redirect:'error',signal});
    if(!response.ok){await response.body?.cancel();const error=Error('Signup session unavailable');if([401,403].includes(response.status))error.code='blocked';if(response.status===429){error.code='throttled';error.until=now()+retryAfter(response.headers.get('Retry-After'),now());gate.throttle(error.until-now())}throw error}
-   const cookies=response.headers.getSetCookie?.()||[];const token=cookies.map(c=>c.match(/^csrftoken=([^;]+)/)?.[1]).find(Boolean);await readBounded(response);signal.throwIfAborted();if(!token||! /^[a-zA-Z0-9]+$/.test(token))throw Error('Missing anonymous signup CSRF token');lastfmSession={token,until:now()+600000};return lastfmSession})();
+   const cookies=response.headers.getSetCookie?.()||[response.headers.get('set-cookie')||''];const token=cookies.map(c=>c.match(/(?:^|,\s*)csrftoken=([^;]+)/)?.[1]).find(Boolean);await readBounded(response);signal.throwIfAborted();if(!token||! /^[a-zA-Z0-9]+$/.test(token))throw Error('Missing anonymous signup CSRF token');lastfmSession={token,until:now()+600000};return lastfmSession})();
   try{return await lastfmPending}finally{lastfmPending=null}
  }
 
@@ -119,14 +119,15 @@ export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=de
   if(pending.length){const fresh=[];if(platform==='minecraft')fresh.push(...await upstream(platform,pending,signal,notice));else for(const name of pending){signal.throwIfAborted();fresh.push(...await upstream(platform,[name],signal,notice))}for(const row of fresh){if(row.status==='Available'||row.status==='Taken'||row.status==='Restricted/Reserved'||row.code==='unresolved'){const key=platform+':'+row.name;cache.delete(key);cache.set(key,{row,expires:now()+(row.status==='Available'?15000:row.status==='Taken'?600000:60000)});if(cache.size>20000)cache.delete(cache.keys().next().value)}rows.push(row)}}
   return rows;
  }
- async function run({names,platforms,refresh=false},signal,emit,waitForResume=async()=>{}){
+ async function runSerial({names,platforms,refresh=false},signal,emit,waitForResume=async()=>{}){
   const unique=[...new Set(names.map(normalize))];await emit({type:'meta',names:unique.length,total:unique.length*platforms.length,platforms});
   const unsupported=platforms.find(p=>PLATFORMS[p].availability===false);
   if(unsupported){await emit({type:'error',message:PLATFORMS[unsupported].label+' bulk availability cannot currently be verified without authenticated platform access. Check the username in the official app. No names were checked.'});return}
   // Requests share the process-wide gate. A cooldown is a wait, never a result.
   for(const platform of platforms){
-   const size=platform==='minecraft'?10:1;
+   let size;
    for(let i=0;i<unique.length;i+=size){
+    size=platform==='minecraft'?10:1;let hits=0;while(hits<512&&i+hits<unique.length){const hit=cache.get(platform+':'+unique[i+hits]);if(!hit||hit.expires<=now()||refresh&&hit.row.status!=='Taken')break;hits++}if(hits)size=hits;
     signal.throwIfAborted();await waitForResume();const batch=unique.slice(i,i+size);let rows;
     for(let retry=0;;retry++){
      rows=await check(platform,batch,signal,notice=>emit(notice),refresh);
@@ -145,6 +146,17 @@ export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=de
    }
   }
   signal.throwIfAborted();await emit({type:'done'});
+ }
+ async function run(job,signal,emit,waitForResume=async()=>{}){
+  const names=[...new Set(job.names.map(normalize))];
+  // Two Minecraft requests may overlap in network time, but every start still uses the same gate.
+  if(job.platforms.length!==1||job.platforms[0]!=='minecraft'||names.length<=10||gates.minecraft.interval===0)return runSerial(job,signal,emit,waitForResume);
+  await emit({type:'meta',names:names.length,total:names.length,platforms:job.platforms});
+  const lanes=[[],[]];for(let i=0;i<names.length;i+=10)lanes[(i/10)%2].push(...names.slice(i,i+10));
+  const stop=new AbortController(),combined=AbortSignal.any([signal,stop.signal]);let failed=false;
+  const forward=async event=>{if(['meta','done'].includes(event.type)||failed)return;if(event.type==='error'){failed=true;try{await emit(event)}finally{stop.abort()}}else await emit(event)};
+  const outcomes=await Promise.allSettled(lanes.map(names=>runSerial({...job,names},combined,forward,waitForResume)));
+  signal.throwIfAborted();if(failed)return;const rejected=outcomes.find(r=>r.status==='rejected');if(rejected)throw rejected.reason;await emit({type:'done'});
  }
  return {run,check,gates,cache};
 }

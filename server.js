@@ -2,11 +2,13 @@ import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {once} from 'node:events';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
+import {gzipSync,brotliCompressSync,constants} from 'node:zlib';
+import {createRemoteChecker} from './workers/client.js';
 import {createChecker} from './lookup.js';
 import {PLATFORMS} from './platforms.js';
 const publicRoot=new URL('./public/',import.meta.url);
-const assets=new Map([['/',['index.html','text/html; charset=utf-8']],['/index.html',['index.html','text/html; charset=utf-8']],['/app.js',['app.js','text/javascript; charset=utf-8']],['/styles.css',['styles.css','text/css; charset=utf-8']],['/platforms.js',[new URL('./platforms.js',import.meta.url),'text/javascript; charset=utf-8']],['/words.js',['words.js','text/javascript; charset=utf-8']],['/help-data.js',['help-data.js','text/javascript; charset=utf-8']],['/generator.js',['generator.js','text/javascript; charset=utf-8']],['/generator-worker.js',['generator-worker.js','text/javascript; charset=utf-8']],['/icon.svg',['icon.svg','image/svg+xml']],['/favicon.ico',['icon.svg','image/svg+xml']]]);
+const assets=new Map([['/',['index.html','text/html; charset=utf-8']],['/index.html',['index.html','text/html; charset=utf-8']],['/app.js',['app.js','text/javascript; charset=utf-8']],['/styles.css',['styles.css','text/css; charset=utf-8']],['/platforms.js',[new URL('./platforms.js',import.meta.url),'text/javascript; charset=utf-8']],['/words.js',['words.js','text/javascript; charset=utf-8']],['/help-data.js',['help-data.js','text/javascript; charset=utf-8']],['/generator.js',['generator.js','text/javascript; charset=utf-8']],['/generator-worker.js',['generator-worker.js','text/javascript; charset=utf-8']],['/word-match.js',['word-match.js','text/javascript; charset=utf-8']],['/icon.svg',['icon.svg','image/svg+xml']],['/favicon.ico',['icon.svg','image/svg+xml']]]);
 assets.set('/service-icons/minecraft.png',['service-icons/minecraft.png','image/png']);
 for(const platform of Object.keys(PLATFORMS).filter(p=>p!=='minecraft'))assets.set('/service-icons/'+platform+'.svg',['service-icons/'+platform+'.svg','image/svg+xml']);
 const headers={'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"};
@@ -17,6 +19,7 @@ export function validateJob(body){
  const names=[...new Set(body.names.map(n=>n.trim().toLowerCase()))],max=Math.min(...body.platforms.map(p=>PLATFORMS[p].limit));if(names.length>max)throw Error('Selected platforms support at most '+max+' names per search.');if(body.refresh!==undefined&&typeof body.refresh!=='boolean')throw Error('Invalid retry option.');return {names,platforms:body.platforms,...(body.refresh?{refresh:true}:{})};
 }
 export function createApp(engine=createChecker()){
+ const staticCache=new Map();
  let active=0;const clients=new Set();const starts=new Map();const jobs=new Map();
  const server=http.createServer(async(req,res)=>{
   let controller;
@@ -52,7 +55,11 @@ export function createApp(engine=createChecker()){
    }
    if(!['GET','HEAD'].includes(req.method))return send(res,405,JSON.stringify({error:'Use GET.'}));
    const asset=assets.get(url.pathname);if(!asset)return send(res,404,JSON.stringify({error:'Not found.'}));
-   const content=await readFile(asset[0] instanceof URL?asset[0]:new URL(asset[0],publicRoot));send(res,200,req.method==='HEAD'?'':content,asset[1]);
+   let prepared=staticCache.get(url.pathname);if(!prepared){prepared=(async()=>{const content=await readFile(asset[0] instanceof URL?asset[0]:new URL(asset[0],publicRoot));const compress=/^(text\/|image\/svg)/.test(asset[1])&&content.length>512;return {content,etag:'W/"'+createHash('sha256').update(content).digest('hex').slice(0,24)+'"',gzip:compress?gzipSync(content):null,br:compress?brotliCompressSync(content,{params:{[constants.BROTLI_PARAM_QUALITY]:5}}):null}})();staticCache.set(url.pathname,prepared);prepared.catch(()=>staticCache.delete(url.pathname))}
+   const file=await prepared,encoding=req.headers['accept-encoding']||'',kind=file.br&&/\bbr\b/.test(encoding)?'br':file.gzip&&/\bgzip\b/.test(encoding)?'gzip':null,content=kind?file[kind]:file.content;
+   const cacheHeaders={...headers,'Content-Type':asset[1],'Cache-Control':'public, max-age=0, must-revalidate',ETag:file.etag,Vary:'Accept-Encoding'};
+   if(req.headers['if-none-match']===file.etag){res.writeHead(304,cacheHeaders);return res.end()}
+   res.writeHead(200,{...cacheHeaders,...(kind?{'Content-Encoding':kind}:{}),'Content-Length':content.length});res.end(req.method==='HEAD'?undefined:content);
   }catch(error){if(!controller?.signal.aborted)send(res,500,JSON.stringify({error:'Server request failed. Retry.'}))}
  });
  server.requestTimeout=30000;server.headersTimeout=15000;
@@ -61,6 +68,7 @@ export function createApp(engine=createChecker()){
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
  let restrictions=[];if(process.env.RESTRICTIONS_FILE){restrictions=JSON.parse(await readFile(process.env.RESTRICTIONS_FILE,'utf8'));if(!Array.isArray(restrictions))throw Error('Restrictions evidence must be an array')}
- const server=createApp(createChecker({restrictions}));server.listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('Four Name listening on port '+server.address().port));
+ const engine=process.env.CHECK_WORKER_URL?createRemoteChecker({url:process.env.CHECK_WORKER_URL,secret:process.env.CHECK_WORKER_SECRET}):createChecker({restrictions});
+ const server=createApp(engine);server.listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('Four Name listening on port '+server.address().port));
  const shutdown=()=>{server.cancelSearches();server.close(()=>process.exit(0));setTimeout(()=>process.exit(0),10000).unref()};process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
 }

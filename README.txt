@@ -1,8 +1,4 @@
-Four Name — original theme
-
-Run npm ci, then npm start. Open http://localhost:3000.
-Current services: Minecraft Java, GitLab, Last.fm and Discord.
-TikTok/Snapchat have been replaced. Restart the server after replacing files.
-No credentials required. Only verified Available results appear in the grid.
-Minecraft public lookup cannot verify claimability of missing profiles.
-See README.md, SOURCES.md and TESTING.md for details.
+Four Name: preserved original theme, Minecraft and Discord visible by default, optional GitLab/Last.fm in Settings, supplied Minecraft image and requested GitHub link.
+Run Node 22–24: npm ci && npm start. Open http://localhost:3000.
+See README.md for generation coverage, measured improvements and availability limitations; workers/README.md for deployment/integration.
+31 tests pass; hosting and browser screenshot validation remain outstanding. Minecraft profile absence is Unknown, not Available.

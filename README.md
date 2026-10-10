@@ -1,105 +1,80 @@
 # Four Name
 
-The original dark/light interface with Minecraft Java, GitLab, Last.fm and Discord.
-TikTok and Snapchat were replaced with services that returned usable public
-username-check responses in live verification. Exactly one service is selected;
-Minecraft remains the default. The existing layout, controls and available-only
-name grid are preserved. No tokens, passwords or login are required.
+Generate and check usernames while retaining the original dark/light theme and available-only result grid. Minecraft is selected by default. Minecraft and Discord are visible initially; Settings enables GitLab and Last.fm, saves service preferences in this browser and always leaves at least one service enabled. Searches select exactly one service. The header includes Documentation and the requested [GitHub repository](https://github.com/Leofreddare/four-name). The supplied Minecraft image is used at 36 × 36 pixels for its 18-pixel display.
 
 ## Run
 
-Node.js 22–24:
+Node 22–24:
 
 ```sh
 npm ci
 npm start
 ```
 
-Open http://localhost:3000. Set PORT for another port. For production use
-`npm ci --omit=dev`. The included Render configuration starts a Node server.
-Replace the application files and restart the server when updating. No public
-hosting deployment was performed.
+Open http://localhost:3000. Production installs can use `npm ci --omit=dev`. Set `PORT` as needed. `render.yaml` deploys the full Node app. Restart after changing assets: the server keeps prepared static responses in memory. No production hosting deployment was performed.
 
-## Availability evidence
+## Generation coverage
 
-- Last.fm: the public partial signup validator must explicitly accept the
-  username. A positive success message alone is insufficient: it also appears
-  in negative responses. The app obtains an anonymous CSRF cookie through the
-  ordinary public signup page and reuses that session for ten minutes. It never
-  submits a password, creates an account or attempts to solve a CAPTCHA.
-- GitLab.com: the public signup namespace check must explicitly return
-  `exists:false`, and the candidate must pass local naming/reservation checks.
-  Official reserved routes, AI prefixes and shadowed route prefixes are excluded.
-  GitLab also restricts filename extensions and hidden Pages domains. Candidates
-  containing periods or hyphens that cannot be fully cleared remain Unknown,
-  even if the namespace endpoint returns false. Generation defaults use short
-  letters/digits/underscore candidates to avoid those ambiguous cases.
-- Discord: the public signup check must explicitly return `taken:false`.
-  Specific platform policy rejections are Restricted/Reserved. Undocumented
-  signup endpoints may change; unfamiliar responses fail closed.
-- Minecraft: matching names and UUIDs confirm Taken. Missing profiles remain
-  Unknown because public lookup cannot rule out locked, reserved or blocked
-  names. The actual Minecraft availability endpoint requires account
-  authorization; no credentials are collected. Minecraft is retained at the
-  user's request, with this accuracy limitation.
+**Before:** spaces of at most 200,000 combinations were enumerated, then capped by the name budget. Larger spaces used at most `max(1000, budget × 30)` random attempts, biased toward required characters and dictionary fragments. That was a subset: candidates could be missed, and restrictive filters could produce short batches even when more matches existed. Character presets omitted periods/hyphens and the UI stopped at seven characters.
 
-Every positive check is a time-of-check observation, not a reservation or
-account-specific guarantee. Confirm on the service before claiming a name.
+**Now:** Exhaustive traversal is the default. It traverses the Cartesian product of the selected per-position character pools exactly once using an odometer and BigInt cursor. Fixed positions, prefix/suffix, excluded/custom characters, start/end types and shape equality groups constrain those pools. Every remaining combination is tested against the shared service rules, English matching, required/contains/avoid text, unique/adjacent-repeat and count filters. Paired/alternating shapes enforce their distinct-block meanings. No randomized placement or attempt cap excludes combinations in this mode.
 
-| Status | Evidence |
-| --- | --- |
-| Available | Explicit positive signup/namespace response and applicable local checks. |
-| Taken | Matching Mojang profile or service reports name already unavailable/occupied. |
-| Restricted/Reserved | Explicit platform rejection, official reserved policy, or sourced operator evidence. |
-| Invalid | Violates supported naming rules. |
-| Unknown | Inconclusive, hidden reservation risk, request failure, throttling or changed schema. |
+The count is still a **per-run check budget**: default 2,000, up to 10,000 for Minecraft/Discord or 2,000 for GitLab/Last.fm. It does not promise that a huge space is checked in one run. After completing a batch, Find names with unchanged settings continues at the next cursor. Interrupted checks use Resume search for unfinished names first. Stop during generation does not commit the unsubmitted cursor. Reset, changed generation settings, or a page reload starts a new traversal; completed checks can be skipped within the browser session. Once a space is exhausted, repeating it with session skipping produces no new names.
 
-Only Available names appear as cards or in CSV export. Other statuses are
-retained for processing, not mixed into the result list. Results render in pages
-of 50. The names slider defaults to 2,000. Minecraft/Discord permit up to 10,000
-candidates; GitLab/Last.fm cap each run at 2,000. The original generation control
-keeps its seven-character maximum. Service validation is separate from that
-short-name generation limit.
+The UI reports candidates generated, combinations visited, and combinations in the constrained pools. This denominator is an **upper bound before final filters**, not a fabricated count of matching or claimable names. Finding an exact filtered count generally requires visiting the whole space. A four-letter letters-only space has 26⁴ = 456,976 combinations; a full enumeration can be huge. Tight filters can therefore take time even if the check budget is small. Stop remains responsive.
 
-## Reliability
+Generation supports 2–32 characters, with the selected service's minimum/maximum applied. Minecraft stops at 16 and Last.fm at 15. GitLab permits longer usernames but the generator intentionally caps them at 32. The extended character preset adds periods and hyphens; service-incompatible characters/positions are pruned. Names normalize to lowercase account identities. Uppercase spelling variations are not separate candidates. The selected character preset/custom-set intersection defines the coverage; characters outside it are deliberately excluded.
 
-Native Node fetch reuses connections. Requests share process-wide pacing gates:
-Minecraft uses batches of ten, one start per second; GitLab/Last.fm start at one
-request per two seconds; Discord starts at one per five seconds and slows after
-429s. Last.fm's initial session request is also paced. These are conservative app
-limits, not a promise of platform quotas. Three simultaneous searches maximum.
+**Sampled / word-prioritized subset** retains the faster randomized approach for enormous or strongly constrained spaces. It is explicitly labeled and can miss matches; it is not exhaustive. Small spaces may still be enumerated in sampled mode. Generation posts batches of at most 512 matching names plus progress from a module Worker; only the current budget (at most 10,000 names) is buffered, rather than the whole search space. Browsers without Worker support use the same algorithm with periodic yields. Checking starts after this bounded candidate batch is prepared.
 
-Available observations cache for only 15 seconds; occupied observations for ten
-minutes; unresolved results for one minute. Manual resume refreshes candidates
-that require verification. Each fetch/body has a ten-second timeout; transient
-failures have at most three attempts with backoff. Retry-After is honored. Discord
-uses the longer supplied header/body window. Bulk searches show a cooldown
-countdown and retry the same candidate automatically, at most three cooldown
-recoveries. Stop cancels active requests and waits; Pause holds new work.
+## Filters and English matching
 
-Access blocks and exhausted transient failures interrupt the run. Unrequested
-names are never counted as checked. The existing Find names button becomes
-Resume search and retains completed results. No proxy rotation, CAPTCHA solving,
-authentication bypass or fabricated availability is used.
+Contains, Exclude characters, Must include characters, Avoid text and No adjacent repeats are now normal controls. Specialized counts, custom character sets, positional character classes and check order stay in Advanced. Word controls provide:
 
-Run one server instance for shared in-memory limits, or coordinate them centrally
-before scaling. Reverse proxies must not buffer /api/check. Candidate names are
-sent only to the selected service; anonymous session cookies remain server-side.
-No credential or search-history storage is used.
+- Common curated vocabulary (273 words) or the broader bundled vocabulary (2,278 words), plus custom 3–32-letter words.
+- Substring matching or whole-word boundaries: `cat` matches `scatter` only in substring mode. Boundaries are non-letter characters or the name's edges; this is dictionary matching, not linguistic tokenization.
+- Anywhere, at start, at end, or whole-name position; minimum word length of 3–7 letters.
+- Optional leetspeak, disabled by default to avoid accepting digit substitutions unexpectedly.
 
-## Optional Minecraft restriction evidence
+Generation and result filtering share one matcher. The dictionary and help guide load on demand; generation, vocabulary matching, session deduplication, sorting and filtering stay on the client. Only Available names enter the grid/export. Other observations remain internal for progress and retries.
 
-RESTRICTIONS_FILE may point to a trusted operator JSON array of explicitly
-confirmed restrictions. Records require platform, name, reason, source HTTPS URL,
-confirmedAt and expiresAt; evidence must expire within 24 hours. This is a trusted
-assertion, not automatic source verification. Never populate it from missing
-profiles or guesses. The example file intentionally contains no names.
+## Availability and limitations
 
-## Verification and attribution
+The statuses remain Available, Taken, Restricted/Reserved, Invalid and Unknown. No failed request, missing profile, challenge page or unexpected JSON is availability evidence. Available is an observation, not a reservation or guarantee of successful claiming.
 
-`npm test` runs the automated suite. `npm run test:live` makes a handful of real
-public checks. The optional Playwright suite requires a working Chromium install.
-See TESTING.md for exact checks and the browser limitation, SOURCES.md for research,
-and licenses/ for retained attribution. The Minecraft selector uses the actual
-96px favicon downloaded unchanged from Minecraft.net, not the earlier third-party
-block image or text mark. Social brand SVGs are local Font Awesome assets.
+- **Minecraft Java:** exact matching public UUID profiles confirm Taken. Missing profiles stay Unknown: locks, reservations and moderation blocks cannot be ruled out publicly. The authenticated Minecraft availability endpoint returned HTTP 401 in the current unauthenticated live probe. No tokens or passwords are accepted. To mark a confirmed restriction, set `RESTRICTIONS_FILE` to sourced, timestamped, expiring evidence records using `restrictions.example.json`. There is no invented hardcoded locked-name list.
+- **Discord:** explicit public signup `taken:false` confirms Available; `taken:true` confirms Taken. Recognized policy rejections are Restricted/Reserved. This internal signup endpoint is not a guaranteed public developer API. Rate limits, access blocks and changed/challenge schemas can interrupt searches. Discord display names and old `#tag` forms are not usernames.
+- **GitLab:** explicit signup namespace `exists:false` is accepted only after local reservation checks. Known routes/AI prefixes are restricted. Dotted/hyphenated candidates remain Unknown where hidden Pages/reserved-suffix policy cannot be excluded. Default pacing is 3.1 seconds per request start, below the documented username-exists limit of 20/minute/IP; returned throttling can require longer waits.
+- **Last.fm:** the partial signup validator must explicitly accept the username field. An echoed success string alone is insufficient. The server reuses an anonymous CSRF signup session for ten minutes; it never logs in, submits passwords, creates accounts or solves challenges.
+
+## Performance and measurement
+
+Raw baseline/final data and a reproducible script are in `benchmarks/`. Latest local Node measurements on this workspace:
+
+| Measurement | Before | After | Meaning |
+| --- | --- | --- | --- |
+| Initial document/CSS/eager module transfer, excluding icons | 105,397 bytes, uncompressed | 22,245 bytes, Brotli | About 4.7× smaller; dictionary, generator and help split from initial module graph. Not an input-to-paint measurement. |
+| Generate 10,000 unfiltered four-letter candidates, five-run median | 42.7 ms | 5.5 ms | About 7.8× in the final run; warm-up and contention caused later medians to vary around 5–11 ms. No claim of equivalent live API speedup. |
+| Cached 10,000-name checker + JSON serialization, five-run median | 14.3 ms | 10.6 ms | About 1.35×; result chunks grow to 512 rather than emitting a single cached Discord row each time. Synthetic cached evidence only. |
+| 40 Minecraft names with synthetic 25-ms upstream delay | 106 ms, sequential | 56 ms, two requests overlapping | About 1.9× on the fixture. Real starts remain globally paced; provider latency/limits dominate. |
+| JSDOM budget input / theme toggles / 50-row page change | No baseline | 7.0 / 1.0 / 6.7 ms | JS/DOM dispatch only; no browser paint measurement. |
+| Synthetic 10,000-result UI search | No baseline | 73 ms | Retains all observations, renders only 50 cards/page. No fabricated production results. |
+
+Static responses are read/precompressed once per process, served as Brotli/gzip when accepted, and revalidated with ETags/304 rather than retransmitting unchanged assets. Icons are local, lazily decoded and limited to display needs; supplied Minecraft image fell from 9,899 to 958 bytes. Native fetch reuses connections where the runtime supports it. Cached checks adapt up to 512 rows; uncached Mojang batches remain ten. Two Minecraft requests may overlap their network time while sharing one start gate. Other signup checks remain sequential and globally paced. Maximum three searches are admitted per Node process, with bounded upstream bodies, ten-second request/body deadlines, bounded retry/backoff, rate-header cooldowns, cancellation and pause controls. Results stream as batches finish. Transient failures halt without counting an unrequested tail.
+
+These changes meet the local speed goal on the simple generator; **uncached external searches are not 5× faster overall**. A 2,000-name Discord scan can still take hours at conservative public pacing, and an API block can halt it. Workers can improve routing/offload server work; they cannot remove quotas. Do not deploy independent checker replicas to multiply platform request rates.
+
+## Workers and verification
+
+See [workers/README.md](workers/README.md) for verified current Cloudflare/Render free limits, deployment commands, server-side secrets, four-service support and integration. The app automatically uses the optional remote checker when its Node server has `CHECK_WORKER_URL` and `CHECK_WORKER_SECRET`. Cloudflare uses a single Durable Object; the Node snippet is a single-instance alternative. These snippets are locally tested; hosting deployment/provider-runtime validation remains to be performed.
+
+```sh
+npm test
+npm run test:live
+node benchmarks/measure.mjs
+npm run test:browser
+```
+
+31 automated tests pass, covering coverage/resumption, English matching, service rules, restricted Minecraft evidence, rate limits, concurrency, cancellation, pause, compression/ETags, bounded DOM, optional service settings and worker validation. Small live probes on 2026-10-10 confirmed Minecraft Taken/Unknown, Discord Taken/Available/Restricted, GitLab Taken/Available/Restricted, Last.fm Taken/Available, and Minecraft availability's 401. Playwright screenshot verification could not run because its Chromium executable is unavailable in this environment; visual/real-browser responsiveness is not claimed verified.
+
+Original app/third-party notices remain in `licenses/`; the supplied branding is identified separately. See `SOURCES.md` for implementation/API research.
