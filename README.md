@@ -1,6 +1,6 @@
 # Four Name
 
-Generate and check usernames while retaining the original dark/light theme. All services show only verified Available names. Minecraft is selected by default. Minecraft and Discord are visible initially; Settings enables GitLab and Last.fm, saves service preferences in this browser and always leaves at least one service enabled. Searches select exactly one service. Settings, Documentation and the requested [GitHub repository](https://github.com/Leofreddare/four-name) use compact SVG icon buttons with accessible names and tooltips. The latest supplied Minecraft image, image(20261010-113801).png, is optimized to a 56×56 PNG (1,254 bytes) for 21.28 CSS pixels (another 5% smaller, aligned left inside the unchanged service button) and embedded in the app. No separate image upload/request is needed. Colors and pixel artwork are preserved. The search count has one visible slider; generation mode is in Advanced and the explanatory paragraphs are removed.
+Generate and check usernames while retaining the original dark/light theme. Minecraft names with no public profiles appear under Available names; this is a profile-lookup label, not confirmed claimability. Other services show verified Available names. Minecraft is selected by default. Minecraft and Discord are visible initially; Settings enables GitLab and Last.fm, saves service preferences in this browser and always leaves at least one service enabled. Searches select exactly one service. Settings, Documentation and the requested [GitHub repository](https://github.com/Leofreddare/four-name) use compact SVG icon buttons with accessible names and tooltips. The latest supplied Minecraft image, image(20261010-113801).png, is optimized to a 56×56 PNG (1,254 bytes) for 21.28 CSS pixels (another 5% smaller, aligned left inside the unchanged service button) and embedded in the app. No separate image upload/request is needed. Colors and pixel artwork are preserved. The search count has one visible slider; generation mode is in Advanced and the explanatory paragraphs are removed.
 
 ## Run
 
@@ -36,7 +36,7 @@ Contains, Exclude characters, Must include characters, Avoid text and No adjacen
 - Anywhere, at start, at end, or whole-name position; minimum word length of 3–7 letters.
 - Optional leetspeak, disabled by default to avoid accepting digit substitutions unexpectedly.
 
-Generation and result filtering share one matcher. The dictionary and help guide load on demand; generation, vocabulary matching, session deduplication, sorting and filtering stay on the client. All services display and export only Available names. Missing Minecraft profiles remain Unknown internally and are excluded, along with taken, restricted, invalid and failed checks.
+Generation and result filtering share one matcher. The dictionary and help guide load on demand; generation, vocabulary matching, session deduplication, sorting and filtering stay on the client. Minecraft missing-profile observations appear in the Available names grid and exports, retaining the underlying Unknown status and reason in CSV. Other services display only affirmative Available results. Taken, restricted, invalid and failed checks are excluded.
 
 ## Availability and limitations
 
@@ -87,9 +87,7 @@ The Settings icon now uses the existing compact sliders glyph. Minecraft artwork
 
 ## Simple results and optional network boost
 
-Only confirmed Available results appear in the grid or export. Missing Minecraft profiles
-remain inconclusive internally and are excluded. Public Minecraft profile lookup cannot
-confirm claimability, so this public-only checker may return no verified available names.
+Minecraft missing-profile observations appear under Available names, as requested. The heading and result tooltips explain that no public profile was found, while claimability remains unverified. CSV preserves Unknown status and the original reason. Other services require affirmative Available evidence. Public Minecraft profile lookup cannot confirm locks or reservations.
 Production checks first verify a known existing Minecraft profile, reusing that verification
 for five minutes; a broken lookup stops the run instead of counting empty responses.
 

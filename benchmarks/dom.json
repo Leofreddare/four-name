@@ -1,7 +1,7 @@
 {
-  "sliderInputMs": 19.21450900000002,
-  "themeToggleMs": 1.0962819999999738,
-  "synthetic10000ResultSearchMs": 70.58769499999994,
-  "page50RowsMs": 7.578542000000084,
+  "sliderInputMs": 11.736985000000004,
+  "themeToggleMs": 1.0985840000000735,
+  "synthetic10000ResultSearchMs": 110.23932799999989,
+  "page50RowsMs": 10.410527000000002,
   "note": "JSDOM synthetic streaming fixture; measures JS/DOM dispatch, not browser paint, network throughput or input-to-paint."
 }
