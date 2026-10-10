@@ -21,7 +21,7 @@ export function withLocalConfigFallback(remote,local){
 }
 // Server-side only: the shared secret is never exposed to browsers.
 function wait(ms,signal){return new Promise((resolve,reject)=>{const abort=()=>{clearTimeout(timer);reject(signal.reason)},timer=setTimeout(()=>{signal.removeEventListener('abort',abort);resolve()},ms);signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort()})}
-export function createRemoteChecker({url,secret,fetchImpl=fetch,now=Date.now,sleep=wait}){
+function createSerialRemoteChecker({url,secret,fetchImpl=fetch,now=Date.now,sleep=wait}){
  const endpoint=new URL(url);if(endpoint.protocol!=='https:'&&!(endpoint.hostname==='localhost'&&endpoint.protocol==='http:'))throw Error('Worker URL must use HTTPS.');if(!secret||secret.length<32)throw Error('CHECK_WORKER_SECRET must contain at least 32 characters.');
  return {async run({names,platforms,refresh=false},signal,emit,waitForResume=async()=>{}){
   const platform=platforms[0],unique=[...new Set(names.map(normalize))];if(!PLATFORMS[platform]||platforms.length!==1)throw Error('Choose one service.');await emit({type:'meta',names:unique.length,total:unique.length,platforms});
@@ -40,4 +40,27 @@ export function createRemoteChecker({url,secret,fetchImpl=fetch,now=Date.now,sle
    }
   }signal.throwIfAborted();await emit({type:'done'});
  }};
+}
+
+export function createRemoteChecker(options){
+ const serial=createSerialRemoteChecker(options);
+ return {async run(job,signal,emit,waitForResume){
+  const names=[...new Set(job.names.map(normalize))];
+  if(job.platforms.length!==1||job.platforms[0]!=='minecraft'||names.length<=10)return serial.run(job,signal,emit,waitForResume);
+  await emit({type:'meta',names:names.length,total:names.length,platforms:job.platforms});
+  const lanes=[[],[]];for(let i=0;i<names.length;i+=10)lanes[(i/10)%2].push(...names.slice(i,i+10));
+  const stop=new AbortController(),combined=AbortSignal.any([signal,stop.signal]);let failed=false;
+  const forward=async event=>{if(['meta','done'].includes(event.type)||failed)return;if(event.type==='error'){failed=true;try{await emit(event)}finally{stop.abort()}}else await emit(event)};
+  const outcomes=await Promise.allSettled(lanes.map(names=>serial.run({...job,names},combined,forward,waitForResume).catch(error=>{stop.abort();throw error})));
+  signal.throwIfAborted();if(failed)return;const rejected=outcomes.find(r=>r.status==='rejected'&&r.reason?.name!=='AbortError')||outcomes.find(r=>r.status==='rejected');if(rejected)throw rejected.reason;await emit({type:'done'});
+ }};
+}
+
+export function createConfiguredChecker(env,{local,fetchImpl=fetch}={}){
+ const routes=new Map();
+ for(const platform of Object.keys(PLATFORMS)){
+  const key='CHECK_WORKER_'+platform.toUpperCase(),url=env[key+'_URL']||env.CHECK_WORKER_URL;
+  if(url)routes.set(platform,withLocalConfigFallback(createRemoteChecker({url,secret:env[key+'_SECRET']||env.CHECK_WORKER_SECRET,fetchImpl}),local));
+ }
+ return {run(job,...args){return (routes.get(job.platforms[0])||local).run(job,...args)}};
 }

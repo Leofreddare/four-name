@@ -24,3 +24,5 @@ Official references:
 Updated gateway handling: after checking the secret, the Worker returns a structured binding-missing error instead of crashing when CHECKS is absent. On Render, the updated app recovers through its built-in checker only for proven configuration errors before any remote checks were observed. It never switches after upstream blocking, cooldowns, timeouts, partial results or a previous working remote run. Worker 429 and throttled result batches wait and retry the same names (up to three retries).
 
 If using the GitHub web deployment workflow, copy these three files to the root of your **checking-worker repository**, replacing the old versions. Let Cloudflare deploy with wrangler.jsonc; pasting worker.js alone does not provision CHECKS. Preserve the existing CHECK_WORKER_SECRET in Cloudflare and Render.
+
+This updated bundle admits service workloads independently (Minecraft maximum two calls, each other service one) while maintaining shared pacing. Optional CHECK_SERVICE restricts a dedicated deployment to one service. Main-app per-service routing variables and the browser-only deployment steps are documented in ../README.md.

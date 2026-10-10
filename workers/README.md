@@ -65,3 +65,51 @@ These snippets and their Node integration were tested with bounded deterministic
 ## Browser-only worker updates
 
 A current self-contained bundle is included in `workers/web-kit/`. Upload that directory's three files to the root of your checking-worker GitHub repository and let Cloudflare build/deploy with its `wrangler.jsonc`. The main website files belong in the Render-connected repository. No secret belongs in either GitHub repository. For the simplest initial check, remove CHECK_WORKER_URL from Render and redeploy: the app uses its built-in backend, and Cloudflare is optional.
+
+## One worker or separate service workers (web dashboards)
+
+Start with **one Cloudflare worker** using the updated bundle in `workers/web-kit/`.
+It now admits different services independently, with two Minecraft batches sharing
+one gate. Separate workers are optional; they do not make a single service's quota larger.
+
+To isolate services with separate Cloudflare deployments:
+
+1. For each dedicated service, create its own GitHub checking-worker repository containing
+   the three files from `workers/web-kit/` at its root. In the GitHub web editor, change
+   the `name` value in wrangler.jsonc to a distinct name, such as `four-name-minecraft`.
+2. Create a Cloudflare Worker project for each service you want to isolate, connected
+   to its matching repository. Use the same project name you put in wrangler.jsonc.
+   Keep the deploy command `npx wrangler deploy`. Keep the Durable Object binding/class
+   and migration declarations; Cloudflare provisions that project's namespace.
+3. In each Worker’s **Settings → Variables and Secrets**, set secret
+   `CHECK_WORKER_SECRET` to your private random value (at least 32 characters).
+   In the repository's wrangler.jsonc, add a `vars` object with `CHECK_SERVICE` set to exactly
+   `minecraft`, `discord`, `gitlab`, or `lastfm`, matching that project's purpose.
+   For example: `"vars": {"CHECK_SERVICE": "minecraft"}`. Commit to deploy.
+   The secret remains in the Cloudflare dashboard; never put it in this config.
+4. Copy each project's HTTPS workers.dev URL. In **Render → your website service →
+   Environment**, add the matching URL variable below. Use one deployed worker per
+   service; do not configure or rotate a pool of workers for the same service.
+5. Set the shared `CHECK_WORKER_SECRET` on Render if using the same secret everywhere.
+   For different secrets, add the corresponding per-service secret variable below.
+6. Upload the updated main app files to the Render-connected repository and redeploy.
+   Test a small list separately on each service. Provider blocking is an honest failure;
+   it never triggers switching that service to another worker.
+
+| Service | URL variable on Render | Optional secret override on Render |
+| --- | --- | --- |
+| Minecraft | `CHECK_WORKER_MINECRAFT_URL` | `CHECK_WORKER_MINECRAFT_SECRET` |
+| Discord | `CHECK_WORKER_DISCORD_URL` | `CHECK_WORKER_DISCORD_SECRET` |
+| GitLab | `CHECK_WORKER_GITLAB_URL` | `CHECK_WORKER_GITLAB_SECRET` |
+| Last.fm | `CHECK_WORKER_LASTFM_URL` | `CHECK_WORKER_LASTFM_SECRET` |
+
+Per-service URL overrides take precedence over `CHECK_WORKER_URL`. A service without
+an override uses that shared URL, or the built-in Node checker if the shared URL is absent.
+Per-service secrets fall back to the shared `CHECK_WORKER_SECRET`. All of these variables
+remain on the servers. Existing single-worker configuration continues to work.
+
+The worker's `CHECK_SERVICE` restriction prevents it from checking other services.
+Admission is bounded per service even for the all-service worker. Existing namespace
+and class names are preserved on updates; do not delete the Durable Object or change its
+identity to reset rate limits. Cloudflare account quotas still apply across workers.
+The dashboard workflow and live provider behavior must be verified in your account.

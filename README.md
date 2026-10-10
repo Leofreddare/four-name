@@ -1,6 +1,6 @@
 # Four Name
 
-Generate and check usernames while retaining the original dark/light theme and available-only result grid. Minecraft is selected by default. Minecraft and Discord are visible initially; Settings enables GitLab and Last.fm, saves service preferences in this browser and always leaves at least one service enabled. Searches select exactly one service. Settings, Documentation and the requested [GitHub repository](https://github.com/Leofreddare/four-name) use compact SVG icon buttons with accessible names and tooltips. The latest supplied Minecraft image, image(20261010-113801).png, is optimized to a 56×56 PNG (1,254 bytes) for 22.4 CSS pixels (20% smaller inside the unchanged service button) and embedded in the app. No separate image upload/request is needed. Colors and pixel artwork are preserved. The search count has one visible slider; generation mode is in Advanced and the explanatory paragraphs are removed.
+Generate and check usernames while retaining the original dark/light theme and available-only result grid. Minecraft is selected by default. Minecraft and Discord are visible initially; Settings enables GitLab and Last.fm, saves service preferences in this browser and always leaves at least one service enabled. Searches select exactly one service. Settings, Documentation and the requested [GitHub repository](https://github.com/Leofreddare/four-name) use compact SVG icon buttons with accessible names and tooltips. The latest supplied Minecraft image, image(20261010-113801).png, is optimized to a 56×56 PNG (1,254 bytes) for 21.28 CSS pixels (another 5% smaller, aligned left inside the unchanged service button) and embedded in the app. No separate image upload/request is needed. Colors and pixel artwork are preserved. The search count has one visible slider; generation mode is in Advanced and the explanatory paragraphs are removed.
 
 ## Run
 
@@ -75,7 +75,7 @@ node benchmarks/measure.mjs
 npm run test:browser
 ```
 
-36 automated tests pass, covering coverage/resumption, English matching, service rules, restricted Minecraft evidence, rate limits, concurrency, cancellation, pause, compression/ETags, bounded DOM, optional service settings and worker validation. Small live probes on 2026-10-10 confirmed Minecraft Taken/Unknown, Discord Taken/Available/Restricted, GitLab Taken/Available/Restricted, Last.fm Taken/Available, and Minecraft availability's 401. Playwright screenshot verification could not run because its Chromium executable is unavailable in this environment; visual/real-browser responsiveness is not claimed verified.
+39 automated tests pass, covering coverage/resumption, English matching, service rules, restricted Minecraft evidence, rate limits, concurrency, cancellation, pause, compression/ETags, bounded DOM, optional service settings and worker validation. Small live probes on 2026-10-10 confirmed Minecraft Taken/Unknown, Discord Taken/Available/Restricted, GitLab Taken/Available/Restricted, Last.fm Taken/Available, and Minecraft availability's 401. Playwright screenshot verification could not run because its Chromium executable is unavailable in this environment; visual/real-browser responsiveness is not claimed verified.
 
 Original app/third-party notices remain in `licenses/`; the supplied branding is identified separately. See `SOURCES.md` for implementation/API research.
 
@@ -84,3 +84,11 @@ Original app/third-party notices remain in `licenses/`; the supplied branding is
 The server previously hid thrown worker failures behind the same generic Search interrupted message for all services. It now preserves safe, actionable gateway errors without exposing credentials. Known worker configuration failures before any remote checks were observed recover through one shared built-in Node checker; API blocks, throttling, timeouts, unrecognized errors, partial results and prior working remote checks never switch hosts. Worker 429 responses (numeric or date Retry-After) and platform cooldown rows wait and retry the same batch, with cancellation, pause and a three-retry bound. Correct the worker configuration and restart Render to return to Cloudflare.
 
 The Settings icon now uses the existing compact sliders glyph. Minecraft artwork alone is scaled down 20%; the button and its spacing stay unchanged.
+
+## Minecraft profile candidates and service routing
+
+Minecraft public checks return Taken or Unknown, not confirmed Available for absent profiles. The main Available grid/export retains its strict evidence requirements. A separate collapsed Minecraft panel now lets users review/copy names with no public profile, explicitly labeled unverified. It displays at most 50 candidates per page, creates no candidate cards while collapsed, excludes blocked/transient/policy results, and reports taken/no-profile counts. It does not infer that any candidate is claimable.
+
+The GitHub link now has the same rounded background/border/hover behavior as its neighboring buttons. Minecraft artwork is scaled to 21.28px and moved left; its button footprint is unchanged.
+
+Remote Minecraft calls now use two bounded lanes of ten names, sharing the Worker coordinator's existing globally paced Minecraft gate. Worker admission permits at most two Minecraft calls and one per other service; separate services no longer block each other. Gate persistence writes are serialized. Searches in the UI still choose one service. Per-service URL/secret overrides are described in workers/README.md; no random worker rotation is performed. Different service routing isolates workloads and may improve routing, but does not multiply the same platform's quota or prove Minecraft availability. Provider runtime and deployed-site validation remain outstanding.

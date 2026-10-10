@@ -1,6 +1,6 @@
 # Verification — 2026-10-10
 
-All 36 automated tests passed under Node.js 24. Earlier live observations below are historical; this UI update did not repeat upstream checks.
+All 39 automated tests passed under Node.js 24. Earlier live observations below are historical; this UI update did not repeat upstream checks.
 
 - Platform formats, boundaries and case normalization for Minecraft, GitLab,
   Last.fm and Discord; reserved GitLab routes/AI prefixes and ambiguous suffixes.
@@ -62,3 +62,7 @@ Latest UI revision: 31 tests pass. Optional icon loading, Available-only indexin
 Search recovery verification: 36 tests pass. New real-HTTP streaming regressions cover each service recovering from a misconfigured gateway, missing binding diagnostics, 90-second simulated busy/platform cooldown waits, same-batch retry, cancellation, no fallback after blocks/500/502/partial results or an earlier healthy remote run. UI assertions cover the new sliders glyph and 20% artwork transform.
 
 Fresh small live probes on 2026-10-10 returned Discord Taken/Available/Restricted, Minecraft Taken/Unknown, GitLab Taken/Available/Restricted and Last.fm Taken/Available. Minecraft authenticated name availability again returned HTTP 401 without credentials. These observations were made from this environment, not the user's Render or Cloudflare deployment; service behavior from provider IPs can differ.
+
+Latest revision: 39 tests pass. Added service URL/secret selection, bounded two-lane remote Minecraft batching, independent shared-worker service admission, dedicated-service rejection, and the distinct Minecraft candidate view. Existing gate pacing, cooldown and cancellation tests remain. No new claim of public Minecraft claimability or faster provider quotas is made.
+
+Minecraft candidate rendering was also exercised with 10,000 synthetic missing-profile rows: the Available grid/export remain empty, the review panel allocates zero cards while collapsed and 50 cards per page when opened. These are regression fixtures, never production availability results.
