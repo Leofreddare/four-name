@@ -2,13 +2,31 @@
 
 The app works locally with `npm start`; workers are optional. Generation, dictionary matching and candidate filtering stay in the browser worker. A remote checker can reduce origin CPU load or improve the upstream network route; it cannot increase a service's quota or promise a 5× live-search speedup.
 
+## Recommended setup, step by step
+
+Use Cloudflare Workers Free with the included SQLite Durable Object for the checking backend. Keep the existing website on its current Node host. One deployment handles Minecraft, Discord, GitLab and Last.fm. The browser generation Worker is already included and needs no hosting account.
+
+1. Download/extract the newest four-name.zip. Replace the website files on your Node host (or update your GitHub repository if that host deploys from GitHub), then restart/redeploy. This applies the supplied icon too; a downloaded ZIP does not automatically change a live deployment.
+2. Create a Cloudflare account at https://dash.cloudflare.com/ and use Workers Free. No custom domain is required for a workers.dev address.
+3. Install Node 22 or 24 on your computer. Open a terminal in the extracted `four-name` directory, where `package.json` and the `workers` folder are visible. Keep the full directory structure; the snippet imports the shared checker.
+4. Run `npm ci`. Then run the three Wrangler commands below. Login opens Cloudflare authorization in your browser. Deploy creates the Worker and Durable Object from the included config; leave the shared-checker design intact.
+5. Before the `secret put` command, generate a private secret with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Save it privately. Paste this value when Wrangler prompts for CHECK_WORKER_SECRET.
+6. Copy the HTTPS workers.dev URL printed by Deploy.
+7. On the website's **Node host**, open its environment-variable settings. Set `CHECK_WORKER_URL` to that URL and `CHECK_WORKER_SECRET` to the same private value. These are server variables, not HTML/JavaScript or browser settings. Keep the website's start command `npm start`.
+8. Restart/redeploy the website. This switches checks from the local backend to the one remote coordinator.
+9. Start a small 10-name search with one service. Test Discord first, then the others individually. Minecraft missing-profile results being Unknown is expected; workers cannot confirm Minecraft claimability publicly. Signup validators may block a cloud-hosted IP; do not treat that as availability or add fallback hosts to evade it.
+10. If a request fails, inspect Cloudflare Workers > four-name-checks > Logs. 401 means missing/mismatched shared secret; 429 means worker busy/rate limited; 502 means the worker could not verify the batch. Check the app notice and resume only after any cooldown. To return to the built-in Node checker, remove both CHECK_WORKER variables and restart the website.
+
+Worker hosting deployment is not verified yet. Perform the small live test before using large batches. The current account-free signup adapters were verified from the local environment; a provider IP may behave differently.
+
 ## Cloudflare Workers + one Durable Object
 
 From the app directory:
 
 ```sh
-npx wrangler@latest secret put CHECK_WORKER_SECRET --config workers/wrangler.jsonc
+npx wrangler@latest login
 npx wrangler@latest deploy --config workers/wrangler.jsonc
+npx wrangler@latest secret put CHECK_WORKER_SECRET --config workers/wrangler.jsonc
 ```
 
 Use a random shared secret of at least 32 characters. On the main **Node server**, set `CHECK_WORKER_URL` to the deployed Worker HTTPS URL, and `CHECK_WORKER_SECRET` to that same secret. Restart `npm start`. These environment variables never enter browser code. Do not publish the secret in GitHub, a client config, or a URL.

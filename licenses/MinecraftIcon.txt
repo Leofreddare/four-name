@@ -1,3 +1,4 @@
-Minecraft service image supplied by the user in upload/minecraft.png.
-The display copy is resized to 36 × 36 pixels (18 CSS pixels at 2× resolution).
-This asset is not covered by the application MIT license. No affiliation is implied.
+Minecraft service icon derived from the user-provided image(20261010-113801).png.
+56 × 56 display asset (28 CSS pixels at 2×), preserving supplied artwork/colors.
+Embedded in app.js as a PNG data URL so missing deployed image files cannot break the icon.
+This asset is not covered by the application MIT license. No affiliation implied.

@@ -126,3 +126,7 @@ No upstream executable, installer or token-harvesting checker is bundled.
 - [Render free services](https://render.com/docs/free): 750 hours/workspace/month; 15-minute idle sleep, approximately one-minute wake-up; single instance and outgoing-traffic constraints.
 - Dictionary uses the original bundled 2,278-word list with a newly curated 273-word common subset; no third-party word corpus was copied. Generation/matching improvements are independently implemented.
 - Current small live probes confirmed signup validators' explicit positive/negative evidence; Minecraft authenticated availability remained 401 unauthenticated. No account creation, tokens, platform logins or challenge bypasses.
+
+2026-10-10 icon correction: latest image(20261010-111837).png now copied verbatim to the Minecraft service asset, replacing the earlier resized copy. No recoloring; 28px display and content-version query avoid stale icon reuse. Worker README now includes an ordered Cloudflare setup walkthrough.
+
+2026-10-10 final UI correction: image(20261010-113801).png is the current supplied artwork. A nearest-neighbor 56px PNG preserves pixel colors at 28px display, now 1,254 bytes and embedded to prevent missing-asset deployment failures. The earlier verbatim asset above is superseded. Settings/Documentation use original inline outline SVGs; the GitHub header icon uses Font Awesome 6.7.2 brands/github.svg (CC BY 4.0), with attribution in licenses/GitHubHeaderIcon.txt and the retained Font Awesome notice.

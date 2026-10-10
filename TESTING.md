@@ -1,6 +1,6 @@
-# Verification — 2026-10-09
+# Verification — 2026-10-10
 
-All 23 automated tests passed under Node.js 24.
+All 31 automated tests passed under Node.js 24. Earlier live observations below are historical; this UI update did not repeat upstream checks.
 
 - Platform formats, boundaries and case normalization for Minecraft, GitLab,
   Last.fm and Discord; reserved GitLab routes/AI prefixes and ambiguous suffixes.
@@ -38,8 +38,7 @@ Minecraft returned Taken for Notch and Unknown for a missing candidate. The
 actual authenticated availability endpoint returned 401 without credentials.
 No absent/locked Minecraft username was falsely shown as available.
 
-The replacement Minecraft favicon was downloaded from the official website and
-inspected at its actual 96px resolution. It is the official creeper-face icon.
+The service icon now uses the latest user attachment, image(20261010-113801).png, optimized to a 56×56 transparent PNG and embedded in app.js. Tests verify the embedded PNG is under 2,000 bytes and the CSP permits data images. Header icon buttons retain accessible names. The count field is hidden and tests drive the visible slider; removed paragraphs remain absent.
 Reddit, Twitch, TikTok and Snapchat did not return usable availability results in
 live probes and are not presented as working services.
 
@@ -57,3 +56,5 @@ claims are presented. No public deployment was performed.
 2026-10-10: 31 tests pass after the optional-service settings, streamed exhaustive traversal, shared word matcher, static compression/ETag cache, cache batching, two-request Minecraft pipeline and worker integration changes. `tests/improvements.test.js` verifies the full small-space product across budgets, BigInt cursor boundaries, positional/boundary English matching, service-compatible character sets, static HEAD/304 responses, cache chunking, worker secret/schema/batch constraints and overlapping Minecraft requests under one gate. `benchmarks/dom.json` measures synthetic JSDOM interactions and 10,000-result handling; it is not a browser paint benchmark. Raw before/after data in `benchmarks/` preserve the measured evidence and caveats.
 
 Current live probes successfully checked all four service adapters. Playwright remains blocked because Chromium is not installed; no visual screenshot or deployed-worker verification was performed. Worker test fixtures never enter production availability output.
+
+Latest UI revision: 31 tests pass. Optional icon loading, Available-only indexing, bounded 50-card rendering, slider behavior and SVG header buttons are covered. Benchmarks were rerun; see README and benchmarks/after.json. Actual browser paint/visual QA remains unavailable.
