@@ -1,6 +1,6 @@
 # Verification — 2026-10-10
 
-All 39 automated tests passed under Node.js 24. Earlier live observations below are historical; this UI update did not repeat upstream checks.
+All 44 automated tests passed under Node.js 24. Earlier live observations below are historical; this UI update did not repeat upstream checks.
 
 - Platform formats, boundaries and case normalization for Minecraft, GitLab,
   Last.fm and Discord; reserved GitLab routes/AI prefixes and ambiguous suffixes.
@@ -66,3 +66,5 @@ Fresh small live probes on 2026-10-10 returned Discord Taken/Available/Restricte
 Latest revision: 39 tests pass. Added service URL/secret selection, bounded two-lane remote Minecraft batching, independent shared-worker service admission, dedicated-service rejection, and the distinct Minecraft candidate view. Existing gate pacing, cooldown and cancellation tests remain. No new claim of public Minecraft claimability or faster provider quotas is made.
 
 Minecraft candidate rendering was also exercised with 10,000 synthetic missing-profile rows: the Available grid/export remain empty, the review panel allocates zero cards while collapsed and 50 cards per page when opened. These are regression fixtures, never production availability results.
+
+Latest architecture: 44 tests pass. Raw response parity confirms direct and Worker-boosted checks classify identical Minecraft profiles identically. The actual coordinator transport handler is exercised. App cache eliminates repeated Worker calls. Old row-only Workers cannot classify names Taken in the app; missing protocol falls back before checking. Target/method/header/cookie constraints and no switching after upstream blocks/throttles are tested. Minecraft now shows profile-absence candidates in the main grid (50 per page, Unknown in CSV), sampled generation is the default, and other services retain Available-only grids. Earlier separate-panel assertions above describe a superseded UI. Your live provider deployment is not verified.

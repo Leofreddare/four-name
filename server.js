@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {once} from 'node:events';
 import {randomUUID,createHash} from 'node:crypto';
 import {gzipSync,brotliCompressSync,constants} from 'node:zlib';
-import {createConfiguredChecker} from './workers/client.js';
+import {createBoostFetch} from './workers/transport.js';
 import {createChecker} from './lookup.js';
 import {PLATFORMS} from './platforms.js';
 const publicRoot=new URL('./public/',import.meta.url);
@@ -68,7 +68,7 @@ export function createApp(engine=createChecker()){
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
  let restrictions=[];if(process.env.RESTRICTIONS_FILE){restrictions=JSON.parse(await readFile(process.env.RESTRICTIONS_FILE,'utf8'));if(!Array.isArray(restrictions))throw Error('Restrictions evidence must be an array')}
- const local=createChecker({restrictions});const engine=createConfiguredChecker(process.env,{local});
+ const engine=createChecker({restrictions,fetchImpl:createBoostFetch(process.env,{onConfigError:platform=>console.warn('Worker configuration/protocol unavailable for '+platform+'; using built-in requests until restart.')})});
  const server=createApp(engine);server.listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('Four Name listening on port '+server.address().port));
  const shutdown=()=>{server.cancelSearches();server.close(()=>process.exit(0));setTimeout(()=>process.exit(0),10000).unref()};process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
 }

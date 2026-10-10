@@ -1,4 +1,12 @@
-# Cloudflare web-only setup
+# Cloudflare network-helper kit
+
+Use these three files in your existing Cloudflare-connected worker GitHub repository.
+Replace worker.js, wrangler.jsonc and README.md, then commit and let Cloudflare deploy.
+Keep the existing CHECK_WORKER_SECRET; it must match Render. Redeploy the updated main
+app on Render too. The helper transports supported public API responses; the app owns
+classification and caching. It is not an open proxy: authenticated calls, exact approved
+upstream URLs/methods, bounded bodies and restricted headers are enforced.
+
 
 No terminal or local Node installation required. This kit is a self-contained checking backend for Minecraft, Discord, GitLab and Last.fm; your website stays on its existing Node host.
 

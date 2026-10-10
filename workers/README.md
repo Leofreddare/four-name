@@ -1,10 +1,23 @@
-# Optional checking workers
+# Optional network boost
+
+The app works with `npm start` alone. Its own checker remains in charge of parsing,
+classification, cache, retries and streaming. With CHECK_WORKER_URL configured, the
+Cloudflare Worker only forwards the supported public API requests and returns raw
+upstream responses. Its shared gates coordinate request starts across app callers.
+It does not generate candidates or decide that usernames are Available/Taken.
+
+Update the main app on Render **and** the three files in `workers/web-kit/` in your
+Cloudflare-connected worker repository. Existing secrets and URLs can stay unchanged.
+An old worker rejects the new transport protocol before an upstream request; the app
+then uses its built-in requests until restart. Upstream blocks/throttling/failures never
+cause host rotation. Keep one route per service.
+
 
 The app works locally with `npm start`; workers are optional. Generation, dictionary matching and candidate filtering stay in the browser worker. A remote checker can reduce origin CPU load or improve the upstream network route; it cannot increase a service's quota or promise a 5× live-search speedup.
 
 ## Recommended setup, step by step
 
-Use Cloudflare Workers Free with the included SQLite Durable Object for the checking backend. Keep the existing website on its current Node host. One deployment handles Minecraft, Discord, GitLab and Last.fm. The browser generation Worker is already included and needs no hosting account.
+Use Cloudflare Workers Free with the included SQLite Durable Object for the checking backend. Keep the existing website on its current Node host. One deployment handles Minecraft, Discord, GitLab and Last.fm. The browser generation Worker is already included and needs no hosting account. The optional Cloudflare checker is a network helper, not a replacement for app logic.
 
 1. Download/extract the newest four-name.zip. Replace the website files on your Node host (or update your GitHub repository if that host deploys from GitHub), then restart/redeploy. This applies the supplied icon too; a downloaded ZIP does not automatically change a live deployment.
 2. Create a Cloudflare account at https://dash.cloudflare.com/ and use Workers Free. No custom domain is required for a workers.dev address.
@@ -13,7 +26,7 @@ Use Cloudflare Workers Free with the included SQLite Durable Object for the chec
 5. Before the `secret put` command, generate a private secret with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Save it privately. Paste this value when Wrangler prompts for CHECK_WORKER_SECRET.
 6. Copy the HTTPS workers.dev URL printed by Deploy.
 7. On the website's **Node host**, open its environment-variable settings. Set `CHECK_WORKER_URL` to that URL and `CHECK_WORKER_SECRET` to the same private value. These are server variables, not HTML/JavaScript or browser settings. Keep the website's start command `npm start`.
-8. Restart/redeploy the website. This switches checks from the local backend to the one remote coordinator.
+8. Restart/redeploy the website. This enables raw-response networking through the remote coordinator; result handling stays in the app.
 9. Start a small 10-name search with one service. Test Discord first, then the others individually. Minecraft missing-profile results being Unknown is expected; workers cannot confirm Minecraft claimability publicly. Signup validators may block a cloud-hosted IP; do not treat that as availability or add fallback hosts to evade it.
 10. The updated app can return to its built-in Node checker after a confirmed configuration failure (401/404/405 or binding-missing), only before any remote checks were observed in this process. It does not switch for platform blocks, throttling, timeouts, unknown Worker failures, partial results or previously working remote checks. To keep using Cloudflare, correct the configuration and restart Render. Worker busy/platform cooldowns automatically wait and retry the same batch, up to three retries. If a request fails, inspect Cloudflare Workers > four-name-checks > Logs. 401 means missing/mismatched shared secret; 429 means worker busy/rate limited; 502 means the worker could not verify the batch. Check the app notice and resume only after any cooldown. To return to the built-in Node checker, remove both CHECK_WORKER variables and restart the website.
 
@@ -33,7 +46,7 @@ Use a random shared secret of at least 32 characters. On the main **Node server*
 
 `cloudflare.js` is the entry snippet; Wrangler bundles `lookup.js` and `platforms.js` directly, without a framework or runtime dependencies. Its single SQLite-backed Durable Object owns every service gate and shares caches/sessions across callers. Gate timestamps and throttled Discord intervals persist across object restarts; observation caches and anonymous sessions are intentionally ephemeral. Use this one checker deployment for the app. Do not run local and remote scans simultaneously to multiply service quotas, shard it by caller, rotate hosts, or circumvent platform challenges.
 
-Calls contain at most ten Minecraft names or one other-service name. This stays well below the free-tier 50 external subrequests per invocation even with bounded retries and Last.fm's anonymous session setup. Browser requests remain same-origin; the Node integration calls the remote checker and streams each completed batch back to the UI. Pause prevents the next worker call; Stop aborts the app request. An already-running remote request may finish if the provider doesn't propagate disconnect cancellation, but no further app batches are launched. Interrupted worker calls preserve unfinished names for Resume search. Authentication, non-success responses, schema changes, and rate limits fail closed. Busy workers return 429, rather than starting parallel unpaced scans.
+Calls contain at most ten Minecraft names or one other-service API request. This stays well below the free-tier 50 external subrequests per invocation even with bounded retries and Last.fm's anonymous session setup. Browser requests remain same-origin; the Node integration calls the remote checker and streams each completed batch back to the UI. Pause prevents the next worker call; Stop aborts the app request. An already-running remote request may finish if the provider doesn't propagate disconnect cancellation, but no further app batches are launched. Interrupted worker calls preserve unfinished names for Resume search. Authentication, non-success responses, schema changes, and rate limits fail closed. Busy workers return 429, rather than starting parallel unpaced scans.
 
 For confirmed, sourced restrictions, set a `RESTRICTIONS_JSON` secret with the same expiring record schema as `restrictions.example.json`. `RESTRICTIONS_FILE` is used only by the local Node checker, not automatically uploaded to the worker. Minecraft never emits Available from a public profile absence.
 

@@ -1,6 +1,6 @@
 # Four Name
 
-Generate and check usernames while retaining the original dark/light theme and available-only result grid. Minecraft is selected by default. Minecraft and Discord are visible initially; Settings enables GitLab and Last.fm, saves service preferences in this browser and always leaves at least one service enabled. Searches select exactly one service. Settings, Documentation and the requested [GitHub repository](https://github.com/Leofreddare/four-name) use compact SVG icon buttons with accessible names and tooltips. The latest supplied Minecraft image, image(20261010-113801).png, is optimized to a 56×56 PNG (1,254 bytes) for 21.28 CSS pixels (another 5% smaller, aligned left inside the unchanged service button) and embedded in the app. No separate image upload/request is needed. Colors and pixel artwork are preserved. The search count has one visible slider; generation mode is in Advanced and the explanatory paragraphs are removed.
+Generate and check usernames while retaining the original dark/light theme. Minecraft shows names without public profiles as unverified candidates; the other services show Available names only. Minecraft is selected by default. Minecraft and Discord are visible initially; Settings enables GitLab and Last.fm, saves service preferences in this browser and always leaves at least one service enabled. Searches select exactly one service. Settings, Documentation and the requested [GitHub repository](https://github.com/Leofreddare/four-name) use compact SVG icon buttons with accessible names and tooltips. The latest supplied Minecraft image, image(20261010-113801).png, is optimized to a 56×56 PNG (1,254 bytes) for 21.28 CSS pixels (another 5% smaller, aligned left inside the unchanged service button) and embedded in the app. No separate image upload/request is needed. Colors and pixel artwork are preserved. The search count has one visible slider; generation mode is in Advanced and the explanatory paragraphs are removed.
 
 ## Run
 
@@ -17,9 +17,9 @@ Open http://localhost:3000. Production installs can use `npm ci --omit=dev`. Set
 
 **Before:** spaces of at most 200,000 combinations were enumerated, then capped by the name budget. Larger spaces used at most `max(1000, budget × 30)` random attempts, biased toward required characters and dictionary fragments. That was a subset: candidates could be missed, and restrictive filters could produce short batches even when more matches existed. Character presets omitted periods/hyphens and the UI stopped at seven characters.
 
-**Now:** Exhaustive traversal is the default. It traverses the Cartesian product of the selected per-position character pools exactly once using an odometer and BigInt cursor. Fixed positions, prefix/suffix, excluded/custom characters, start/end types and shape equality groups constrain those pools. Every remaining combination is tested against the shared service rules, English matching, required/contains/avoid text, unique/adjacent-repeat and count filters. Paired/alternating shapes enforce their distinct-block meanings. No randomized placement or attempt cap excludes combinations in this mode.
+**Exhaustive option:** Exhaustive traversal remains available in Advanced. Sampled generation is again the default, restoring the original approach for broad searches. It traverses the Cartesian product of the selected per-position character pools exactly once using an odometer and BigInt cursor. Fixed positions, prefix/suffix, excluded/custom characters, start/end types and shape equality groups constrain those pools. Every remaining combination is tested against the shared service rules, English matching, required/contains/avoid text, unique/adjacent-repeat and count filters. Paired/alternating shapes enforce their distinct-block meanings. No randomized placement or attempt cap excludes combinations in this mode.
 
-The count is still a **per-run check budget**: default 2,000, up to 10,000 for Minecraft/Discord or 2,000 for GitLab/Last.fm. It does not promise that a huge space is checked in one run. After completing a batch, Find names with unchanged settings continues at the next cursor. Interrupted checks use Resume search for unfinished names first. Stop during generation does not commit the unsubmitted cursor. Reset, changed generation settings, or a page reload starts a new traversal; completed checks can be skipped within the browser session. Once a space is exhausted, repeating it with session skipping produces no new names.
+The count is still a **per-run check budget**: default 2,000, up to 10,000 for Minecraft/Discord or 2,000 for GitLab/Last.fm. It does not promise that a huge space is checked in one run. In exhaustive mode, after completing a batch, Find names with unchanged settings continues at the next cursor. Sampled mode generates another deduplicated subset. Interrupted checks use Resume search for unfinished names first. Stop during generation does not commit the unsubmitted cursor. Reset, changed generation settings, or a page reload starts a new traversal; completed checks can be skipped within the browser session. Once a space is exhausted, repeating it with session skipping produces no new names.
 
 The results panel reports candidates generated; its tooltip retains combinations visited and combinations in the constrained pools. This denominator is an **upper bound before final filters**, not a fabricated count of matching or claimable names. Finding an exact filtered count generally requires visiting the whole space. A four-letter letters-only space has 26⁴ = 456,976 combinations; a full enumeration can be huge. Tight filters can therefore take time even if the check budget is small. Stop remains responsive.
 
@@ -36,7 +36,7 @@ Contains, Exclude characters, Must include characters, Avoid text and No adjacen
 - Anywhere, at start, at end, or whole-name position; minimum word length of 3–7 letters.
 - Optional leetspeak, disabled by default to avoid accepting digit substitutions unexpectedly.
 
-Generation and result filtering share one matcher. The dictionary and help guide load on demand; generation, vocabulary matching, session deduplication, sorting and filtering stay on the client. Only Available names enter the grid/export. Other observations remain internal for progress and retries.
+Generation and result filtering share one matcher. The dictionary and help guide load on demand; generation, vocabulary matching, session deduplication, sorting and filtering stay on the client. Minecraft profile-absence candidates enter its grid/export as Unknown with the original evidence and reason; no-profile absence is not confirmed claimability. Other services export Available names only. Taken/restricted/invalid/failed checks never enter either result grid.
 
 ## Availability and limitations
 
@@ -66,7 +66,7 @@ These changes meet the local speed goal on the simple generator; **uncached exte
 
 ## Workers and verification
 
-See [workers/README.md](workers/README.md) for verified current Cloudflare/Render free limits, deployment commands, server-side secrets, four-service support and integration. The app automatically uses the optional remote checker when its Node server has `CHECK_WORKER_URL` and `CHECK_WORKER_SECRET`. Cloudflare uses a single Durable Object; the Node snippet is a single-instance alternative. These snippets are locally tested; hosting deployment/provider-runtime validation remains to be performed.
+See [workers/README.md](workers/README.md) for verified current Cloudflare/Render free limits, deployment commands, server-side secrets, four-service support and integration. The app automatically uses the optional Worker as a raw-response network helper when its Node server has `CHECK_WORKER_URL` and `CHECK_WORKER_SECRET`. Cloudflare uses a single Durable Object; the Node snippet is a single-instance alternative. These snippets are locally tested; hosting deployment/provider-runtime validation remains to be performed.
 
 ```sh
 npm test
@@ -75,7 +75,7 @@ node benchmarks/measure.mjs
 npm run test:browser
 ```
 
-39 automated tests pass, covering coverage/resumption, English matching, service rules, restricted Minecraft evidence, rate limits, concurrency, cancellation, pause, compression/ETags, bounded DOM, optional service settings and worker validation. Small live probes on 2026-10-10 confirmed Minecraft Taken/Unknown, Discord Taken/Available/Restricted, GitLab Taken/Available/Restricted, Last.fm Taken/Available, and Minecraft availability's 401. Playwright screenshot verification could not run because its Chromium executable is unavailable in this environment; visual/real-browser responsiveness is not claimed verified.
+44 automated tests pass, covering coverage/resumption, English matching, service rules, restricted Minecraft evidence, rate limits, concurrency, cancellation, pause, compression/ETags, bounded DOM, optional service settings and worker validation. Small live probes on 2026-10-10 confirmed Minecraft Taken/Unknown, Discord Taken/Available/Restricted, GitLab Taken/Available/Restricted, Last.fm Taken/Available, and Minecraft availability's 401. Playwright screenshot verification could not run because its Chromium executable is unavailable in this environment; visual/real-browser responsiveness is not claimed verified.
 
 Original app/third-party notices remain in `licenses/`; the supplied branding is identified separately. See `SOURCES.md` for implementation/API research.
 
@@ -85,10 +85,30 @@ The server previously hid thrown worker failures behind the same generic Search 
 
 The Settings icon now uses the existing compact sliders glyph. Minecraft artwork alone is scaled down 20%; the button and its spacing stay unchanged.
 
-## Minecraft profile candidates and service routing
+## Restored Minecraft search and optional network boost
 
-Minecraft public checks return Taken or Unknown, not confirmed Available for absent profiles. The main Available grid/export retains its strict evidence requirements. A separate collapsed Minecraft panel now lets users review/copy names with no public profile, explicitly labeled unverified. It displays at most 50 candidates per page, creates no candidate cards while collapsed, excludes blocked/transient/policy results, and reports taken/no-profile counts. It does not infer that any candidate is claimable.
+The original app returned missing profiles as `unclaimed`, rather than proving availability.
+That candidate search is restored in the main Minecraft grid, explicitly labeled
+**Minecraft candidates**. Unknown/unresolved results can be copied and exported with their
+status and reason; locked/reserved names may still be in this candidate list. Taken,
+confirmed restrictions, invalid names, blocking and transient failures are excluded.
+The old no-profile results were never evidence that a name could actually be claimed.
+Default generation is sampled/word-prioritized again; exhaustive mode remains in Advanced.
+Sampling may miss matches, and no specific proportion of missing profiles is guaranteed.
 
-The GitHub link now has the same rounded background/border/hover behavior as its neighboring buttons. Minecraft artwork is scaled to 21.28px and moved left; its button footprint is unchanged.
+The main app always owns generation, validation, caching, service response parsing,
+classification, retry/backoff, pause/cancellation and streamed progress. With Worker URLs
+configured, `workers/transport.js` forwards only the supported public API requests through
+Cloudflare and reconstructs the upstream response. The Worker returns raw bodies/status/
+selected headers, not availability decisions. It applies its shared rate gate and bounded
+service admission; the app still applies its own pacing. Cached results never call the
+Worker. No scan is divided across IPs or redundant routes to multiply platform quotas.
 
-Remote Minecraft calls now use two bounded lanes of ten names, sharing the Worker coordinator's existing globally paced Minecraft gate. Worker admission permits at most two Minecraft calls and one per other service; separate services no longer block each other. Gate persistence writes are serialized. Searches in the UI still choose one service. Per-service URL/secret overrides are described in workers/README.md; no random worker rotation is performed. Different service routing isolates workloads and may improve routing, but does not multiply the same platform's quota or prove Minecraft availability. Provider runtime and deployed-site validation remain outstanding.
+The previous preclassified Worker client remains for compatibility tests, but server.js
+no longer uses it to execute searches. Old workers reject the new protocol before an
+upstream request, allowing the app to retain built-in checking until the updated Worker
+is deployed. Successful raw transport followed by blocking/throttling/unknown failures
+never switches hosts. Update both the main app and the self-contained `workers/web-kit/`
+bundle to activate the boost. Per-service URL/secret overrides continue to work.
+The new transport is deterministic-test verified; your live Cloudflare/Render configuration
+and actual speed improvement are not verified here. Extra network hops can be slower.
