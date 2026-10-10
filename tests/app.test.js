@@ -7,6 +7,14 @@ const id='069a79f444e94726a5befca90e38aaf5';
 const signal=()=>new AbortController().signal;
 const instant=async()=>{};
 const checker=options=>createChecker({intervals:{minecraft:0,gitlab:0,lastfm:0,discord:0},wait:instant,...options});
+test('Minecraft production verification detects empty lookup failures and reuses a valid probe',async()=>{
+ const calls=[];const c=checker({verifyMinecraft:true,fetchImpl:async(url,{body})=>{const names=JSON.parse(body);calls.push(names);return Response.json(names[0]==='notch'?[{name:'Notch',id}]:[])}});
+ assert.equal((await c.check('minecraft',['fresh_fixture'],signal()))[0].status,'Unknown');
+ await c.check('minecraft',['other_fixture'],signal());assert.deepEqual(calls,[['notch'],['fresh_fixture'],['other_fixture']]);
+ let attempts=0;const broken=checker({verifyMinecraft:true,fetchImpl:async(url,{body})=>{attempts++;assert.deepEqual(JSON.parse(body),['notch']);return Response.json([])}});
+ const events=[];await broken.run({names:['fresh_fixture','other_fixture'],platforms:['minecraft']},signal(),async e=>events.push(e));
+ assert.equal(attempts,3);assert(!events.some(e=>e.type==='results'));assert.equal(broken.cache.size,0);
+});
 test('username format policies, display names, case and platform differences',()=>{
  assert.equal(normalize('  NoTcH '),'notch');assert(validate('minecraft','ab'));assert.equal(validate('minecraft','a'.repeat(16)),null);assert(validate('minecraft','a'.repeat(17)));assert(validate('minecraft','ab.c'));
  assert.equal(validate('discord','.a.b.'),null);assert(validate('discord','a..b'));assert(validate('discord','old#1234'));assert(validate('discord','display name'));assert.equal(validate('discord','a'.repeat(32)),null);

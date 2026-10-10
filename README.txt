@@ -1,6 +1,5 @@
-Four Name: preserved original theme, Minecraft and Discord visible by default, optional GitLab/Last.fm in Settings, supplied Minecraft image and requested GitHub link.
-Run Node 22–24: npm ci && npm start. Open http://localhost:3000.
-See README.md for generation coverage, measured improvements and availability limitations; workers/README.md for deployment/integration.
-44 tests pass; hosting and browser screenshot validation remain outstanding. Minecraft profile absence is Unknown, not Available.
-
-Default sampled generation and main-grid Minecraft no-profile candidates restored. Worker is now an optional raw-response network helper; the app owns result handling/cache. Update both Render and Cloudflare bundle.
+Four-name username generator and checker
+See README.md for setup and workers/web-kit/README.md for browser-based Cloudflare deployment.
+45 automated tests pass. Public Minecraft profile absence cannot establish availability and is excluded from results.
+The simplified Available-only grid shows newest arrivals on page 1. The Worker remains an optional raw-response network helper; the app owns checking and caching.
+Redeploy the updated app on Render. The included worker bundle remains compatible with the current transport protocol.

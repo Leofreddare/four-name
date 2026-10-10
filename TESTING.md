@@ -1,6 +1,6 @@
 # Verification — 2026-10-10
 
-All 44 automated tests passed under Node.js 24. Earlier live observations below are historical; this UI update did not repeat upstream checks.
+All 45 automated tests passed under Node.js 24. Earlier live observations below are historical; this UI update did not repeat upstream checks.
 
 - Platform formats, boundaries and case normalization for Minecraft, GitLab,
   Last.fm and Discord; reserved GitLab routes/AI prefixes and ambiguous suffixes.
@@ -68,3 +68,5 @@ Latest revision: 39 tests pass. Added service URL/secret selection, bounded two-
 Minecraft candidate rendering was also exercised with 10,000 synthetic missing-profile rows: the Available grid/export remain empty, the review panel allocates zero cards while collapsed and 50 cards per page when opened. These are regression fixtures, never production availability results.
 
 Latest architecture: 44 tests pass. Raw response parity confirms direct and Worker-boosted checks classify identical Minecraft profiles identically. The actual coordinator transport handler is exercised. App cache eliminates repeated Worker calls. Old row-only Workers cannot classify names Taken in the app; missing protocol falls back before checking. Target/method/header/cookie constraints and no switching after upstream blocks/throttles are tested. Minecraft now shows profile-absence candidates in the main grid (50 per page, Unknown in CSV), sampled generation is the default, and other services retain Available-only grids. Earlier separate-panel assertions above describe a superseded UI. Your live provider deployment is not verified.
+
+Latest UI supersedes earlier candidate-grid behavior: profile-absence rows are excluded, newest arrivals shift older rows to later pages, existing cards are reused, and checking status hides once results arrive. DOM fixtures cover streamed pagination and 10,000 results. Production Minecraft verification accepts the known profile, reuses the probe, and stops on a uniformly empty lookup response. All 45 tests pass. These are deterministic fixtures, not validation of your deployed provider configuration.

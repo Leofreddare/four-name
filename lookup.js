@@ -56,9 +56,9 @@ export function parseSignup(platform,name,data){
  }
  throw Error('Unexpected signup validation response');
 }
-export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=delay,restrictions=[]}={}){
+export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=delay,restrictions=[],verifyMinecraft=false}={}){
  const gates=Object.fromEntries(['minecraft','gitlab','lastfm','discord'].map(p=>[p,new Gate(intervals[p]??(p==='minecraft'?1000:p==='discord'?5000:p==='gitlab'?3100:2000),now,wait)]));
- const cache=new Map();const circuits=new Map();let lastfmSession=null,lastfmPending=null;
+ const cache=new Map();const circuits=new Map();let lastfmSession=null,lastfmPending=null,minecraftVerifiedUntil=0;
  async function session(signal,gate){
   if(lastfmSession?.until>now())return lastfmSession;
   if(lastfmPending)return lastfmPending;
@@ -80,7 +80,8 @@ export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=de
     if(platform==='lastfm'){const hadSession=lastfmSession?.until>now();csrf=await session(AbortSignal.any([signal,AbortSignal.timeout(10000)]),gate);if(!hadSession)await gate.enter(signal)}
     const combined=AbortSignal.any([signal,AbortSignal.timeout(10000)]),json=platform==='minecraft'||platform==='discord';
     const headers={Accept:'application/json','User-Agent':'FourName/2.0 username-checker','Accept-Language':'en-US',...(json?{'Content-Type':'application/json'}:{}),...(platform==='gitlab'?{'X-Requested-With':'XMLHttpRequest'}:{}),...(platform==='lastfm'?{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest',Referer:'https://www.last.fm/join',Cookie:'csrftoken='+csrf.token}:{})};
-    const body=json?JSON.stringify(platform==='discord'?{username:names[0]}:names):platform==='lastfm'?new URLSearchParams({csrfmiddlewaretoken:csrf.token,userName:names[0],email:''}).toString():undefined;
+    const probe=platform==='minecraft'&&verifyMinecraft&&minecraftVerifiedUntil<=now();
+    const body=json?JSON.stringify(platform==='discord'?{username:names[0]}:probe?['notch']:names):platform==='lastfm'?new URLSearchParams({csrfmiddlewaretoken:csrf.token,userName:names[0],email:''}).toString():undefined;
     const response=await fetchImpl(url,{method:body?'POST':'GET',headers,...(body?{body}:{}),redirect:'error',signal:combined});
     if(response.status===429){
      const header=response.headers.get('Retry-After');let cooldown=header?retryAfter(header,now()):null;
@@ -99,7 +100,9 @@ export function createChecker({fetchImpl=fetch,intervals={},now=Date.now,wait=de
     }
     if(platform==='minecraft'){
      if(!response.ok){await response.body?.cancel();throw Error('Upstream HTTP '+response.status)}
-     return parseMinecraft(names,JSON.parse(await readBounded(response,65536)));
+     const profiles=JSON.parse(await readBounded(response,65536));
+     if(probe){if(!Array.isArray(profiles)||profiles.length!==1||profiles[0]?.name?.toLowerCase()!=='notch'||profiles[0]?.id?.toLowerCase()!=='069a79f444e94726a5befca90e38aaf5')throw Error('Minecraft known-profile verification failed');minecraftVerifiedUntil=now()+300000;attempt--;continue}
+     return parseMinecraft(names,profiles);
     }
     if(!response.ok){await response.body?.cancel();throw Error('Upstream HTTP '+response.status)}
     const data=JSON.parse(await readBounded(response,65536));combined.throwIfAborted();return [parseSignup(platform,names[0],data)];

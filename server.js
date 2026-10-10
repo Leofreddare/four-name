@@ -18,7 +18,7 @@ export function validateJob(body){
  if(!Array.isArray(body.platforms)||!body.platforms.length||body.platforms.length!==1||new Set(body.platforms).size!==body.platforms.length||body.platforms.some(p=>!PLATFORMS[p]))throw Error('Choose exactly one supported service.');
  const names=[...new Set(body.names.map(n=>n.trim().toLowerCase()))],max=Math.min(...body.platforms.map(p=>PLATFORMS[p].limit));if(names.length>max)throw Error('Selected platforms support at most '+max+' names per search.');if(body.refresh!==undefined&&typeof body.refresh!=='boolean')throw Error('Invalid retry option.');return {names,platforms:body.platforms,...(body.refresh?{refresh:true}:{})};
 }
-export function createApp(engine=createChecker()){
+export function createApp(engine=createChecker({verifyMinecraft:true})){
  const staticCache=new Map();
  let active=0;const clients=new Set();const starts=new Map();const jobs=new Map();
  const server=http.createServer(async(req,res)=>{
@@ -68,7 +68,7 @@ export function createApp(engine=createChecker()){
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
  let restrictions=[];if(process.env.RESTRICTIONS_FILE){restrictions=JSON.parse(await readFile(process.env.RESTRICTIONS_FILE,'utf8'));if(!Array.isArray(restrictions))throw Error('Restrictions evidence must be an array')}
- const engine=createChecker({restrictions,fetchImpl:createBoostFetch(process.env,{onConfigError:platform=>console.warn('Worker configuration/protocol unavailable for '+platform+'; using built-in requests until restart.')})});
+ const engine=createChecker({restrictions,verifyMinecraft:true,fetchImpl:createBoostFetch(process.env,{onConfigError:platform=>console.warn('Worker configuration/protocol unavailable for '+platform+'; using built-in requests until restart.')})});
  const server=createApp(engine);server.listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('Four Name listening on port '+server.address().port));
  const shutdown=()=>{server.cancelSearches();server.close(()=>process.exit(0));setTimeout(()=>process.exit(0),10000).unref()};process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
 }

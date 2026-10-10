@@ -1,6 +1,6 @@
 # Four Name
 
-Generate and check usernames while retaining the original dark/light theme. Minecraft shows names without public profiles as unverified candidates; the other services show Available names only. Minecraft is selected by default. Minecraft and Discord are visible initially; Settings enables GitLab and Last.fm, saves service preferences in this browser and always leaves at least one service enabled. Searches select exactly one service. Settings, Documentation and the requested [GitHub repository](https://github.com/Leofreddare/four-name) use compact SVG icon buttons with accessible names and tooltips. The latest supplied Minecraft image, image(20261010-113801).png, is optimized to a 56×56 PNG (1,254 bytes) for 21.28 CSS pixels (another 5% smaller, aligned left inside the unchanged service button) and embedded in the app. No separate image upload/request is needed. Colors and pixel artwork are preserved. The search count has one visible slider; generation mode is in Advanced and the explanatory paragraphs are removed.
+Generate and check usernames while retaining the original dark/light theme. All services show only verified Available names. Minecraft is selected by default. Minecraft and Discord are visible initially; Settings enables GitLab and Last.fm, saves service preferences in this browser and always leaves at least one service enabled. Searches select exactly one service. Settings, Documentation and the requested [GitHub repository](https://github.com/Leofreddare/four-name) use compact SVG icon buttons with accessible names and tooltips. The latest supplied Minecraft image, image(20261010-113801).png, is optimized to a 56×56 PNG (1,254 bytes) for 21.28 CSS pixels (another 5% smaller, aligned left inside the unchanged service button) and embedded in the app. No separate image upload/request is needed. Colors and pixel artwork are preserved. The search count has one visible slider; generation mode is in Advanced and the explanatory paragraphs are removed.
 
 ## Run
 
@@ -21,7 +21,7 @@ Open http://localhost:3000. Production installs can use `npm ci --omit=dev`. Set
 
 The count is still a **per-run check budget**: default 2,000, up to 10,000 for Minecraft/Discord or 2,000 for GitLab/Last.fm. It does not promise that a huge space is checked in one run. In exhaustive mode, after completing a batch, Find names with unchanged settings continues at the next cursor. Sampled mode generates another deduplicated subset. Interrupted checks use Resume search for unfinished names first. Stop during generation does not commit the unsubmitted cursor. Reset, changed generation settings, or a page reload starts a new traversal; completed checks can be skipped within the browser session. Once a space is exhausted, repeating it with session skipping produces no new names.
 
-The results panel reports candidates generated; its tooltip retains combinations visited and combinations in the constrained pools. This denominator is an **upper bound before final filters**, not a fabricated count of matching or claimable names. Finding an exact filtered count generally requires visiting the whole space. A four-letter letters-only space has 26⁴ = 456,976 combinations; a full enumeration can be huge. Tight filters can therefore take time even if the check budget is small. Stop remains responsive.
+Generation tracks combinations visited and combinations in the constrained pools internally. The pool size is an **upper bound before final filters**, not a count of matching or claimable names. Finding an exact filtered count generally requires visiting the whole space. A four-letter letters-only space has 26⁴ = 456,976 combinations; a full enumeration can be huge. Tight filters can therefore take time even if the check budget is small. Stop remains responsive.
 
 Generation supports 2–32 characters, with the selected service's minimum/maximum applied. Minecraft stops at 16 and Last.fm at 15. GitLab permits longer usernames but the generator intentionally caps them at 32. The extended character preset adds periods and hyphens; service-incompatible characters/positions are pruned. Names normalize to lowercase account identities. Uppercase spelling variations are not separate candidates. The selected character preset/custom-set intersection defines the coverage; characters outside it are deliberately excluded.
 
@@ -36,7 +36,7 @@ Contains, Exclude characters, Must include characters, Avoid text and No adjacen
 - Anywhere, at start, at end, or whole-name position; minimum word length of 3–7 letters.
 - Optional leetspeak, disabled by default to avoid accepting digit substitutions unexpectedly.
 
-Generation and result filtering share one matcher. The dictionary and help guide load on demand; generation, vocabulary matching, session deduplication, sorting and filtering stay on the client. Minecraft profile-absence candidates enter its grid/export as Unknown with the original evidence and reason; no-profile absence is not confirmed claimability. Other services export Available names only. Taken/restricted/invalid/failed checks never enter either result grid.
+Generation and result filtering share one matcher. The dictionary and help guide load on demand; generation, vocabulary matching, session deduplication, sorting and filtering stay on the client. All services display and export only Available names. Missing Minecraft profiles remain Unknown internally and are excluded, along with taken, restricted, invalid and failed checks.
 
 ## Availability and limitations
 
@@ -75,7 +75,7 @@ node benchmarks/measure.mjs
 npm run test:browser
 ```
 
-44 automated tests pass, covering coverage/resumption, English matching, service rules, restricted Minecraft evidence, rate limits, concurrency, cancellation, pause, compression/ETags, bounded DOM, optional service settings and worker validation. Small live probes on 2026-10-10 confirmed Minecraft Taken/Unknown, Discord Taken/Available/Restricted, GitLab Taken/Available/Restricted, Last.fm Taken/Available, and Minecraft availability's 401. Playwright screenshot verification could not run because its Chromium executable is unavailable in this environment; visual/real-browser responsiveness is not claimed verified.
+45 automated tests pass, covering coverage/resumption, English matching, service rules, restricted Minecraft evidence, rate limits, concurrency, cancellation, pause, compression/ETags, bounded DOM, optional service settings and worker validation. Small live probes on 2026-10-10 confirmed Minecraft Taken/Unknown, Discord Taken/Available/Restricted, GitLab Taken/Available/Restricted, Last.fm Taken/Available, and Minecraft availability's 401. Playwright screenshot verification could not run because its Chromium executable is unavailable in this environment; visual/real-browser responsiveness is not claimed verified.
 
 Original app/third-party notices remain in `licenses/`; the supplied branding is identified separately. See `SOURCES.md` for implementation/API research.
 
@@ -85,16 +85,18 @@ The server previously hid thrown worker failures behind the same generic Search 
 
 The Settings icon now uses the existing compact sliders glyph. Minecraft artwork alone is scaled down 20%; the button and its spacing stay unchanged.
 
-## Restored Minecraft search and optional network boost
+## Simple results and optional network boost
 
-The original app returned missing profiles as `unclaimed`, rather than proving availability.
-That candidate search is restored in the main Minecraft grid, explicitly labeled
-**Minecraft candidates**. Unknown/unresolved results can be copied and exported with their
-status and reason; locked/reserved names may still be in this candidate list. Taken,
-confirmed restrictions, invalid names, blocking and transient failures are excluded.
-The old no-profile results were never evidence that a name could actually be claimed.
-Default generation is sampled/word-prioritized again; exhaustive mode remains in Advanced.
-Sampling may miss matches, and no specific proportion of missing profiles is guaranteed.
+Only confirmed Available results appear in the grid or export. Missing Minecraft profiles
+remain inconclusive internally and are excluded. Public Minecraft profile lookup cannot
+confirm claimability, so this public-only checker may return no verified available names.
+Production checks first verify a known existing Minecraft profile, reusing that verification
+for five minutes; a broken lookup stops the run instead of counting empty responses.
+
+The UI omits profile-review panels, generated-count and percentage labels, and idle status
+text. Newest results appear first during searches, moving older results to later pages.
+Existing cards are reused, with at most 50 cards rendered per page. Alphabetical sorting is
+available after completion. Sampled generation remains the default; exhaustive mode is in Advanced.
 
 The main app always owns generation, validation, caching, service response parsing,
 classification, retry/backoff, pause/cancellation and streamed progress. With Worker URLs
