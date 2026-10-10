@@ -4,6 +4,7 @@ import {PLATFORMS} from '../platforms.js';
 export default {async fetch(request,env){
  if(request.method!=='POST')return new Response('Use POST',{status:405});
  if(!env.CHECK_WORKER_SECRET||request.headers.get('Authorization')!=='Bearer '+env.CHECK_WORKER_SECRET)return new Response('Unauthorized',{status:401});
+ if(!env.CHECKS?.get||!env.CHECKS?.idFromName)return Response.json({code:'binding-missing'},{status:503});
  return env.CHECKS.get(env.CHECKS.idFromName('shared-checker')).fetch(request);
 }};
 export class CheckCoordinator{

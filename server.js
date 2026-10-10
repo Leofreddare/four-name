@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {once} from 'node:events';
 import {randomUUID,createHash} from 'node:crypto';
 import {gzipSync,brotliCompressSync,constants} from 'node:zlib';
-import {createRemoteChecker} from './workers/client.js';
+import {createRemoteChecker,withLocalConfigFallback} from './workers/client.js';
 import {createChecker} from './lookup.js';
 import {PLATFORMS} from './platforms.js';
 const publicRoot=new URL('./public/',import.meta.url);
@@ -50,7 +50,7 @@ export function createApp(engine=createChecker()){
     res.writeHead(200,{...headers,'Content-Type':'application/x-ndjson; charset=utf-8','Cache-Control':'no-store, no-transform','X-Accel-Buffering':'no'});res.flushHeaders();const jobId=randomUUID(),control={paused:false,waiters:new Set()};jobs.set(jobId,control);const waitForResume=async()=>{while(control.paused){await new Promise((resolve,reject)=>{const finish=()=>{control.waiters.delete(finish);controller.signal.removeEventListener('abort',abort);resolve()},abort=()=>{control.waiters.delete(finish);reject(controller.signal.reason)};control.waiters.add(finish);controller.signal.addEventListener('abort',abort,{once:true});if(controller.signal.aborted)abort()})}controller.signal.throwIfAborted()};
     const heartbeat=setInterval(()=>{if(!res.destroyed&&!res.writableNeedDrain)res.write('{"type":"heartbeat"}\n')},15000);heartbeat.unref();
     const emit=async event=>{if(event.type==='results'||event.type==='done')await waitForResume();if(event.type==='meta')event={...event,jobId};controller.signal.throwIfAborted();if(!res.write(JSON.stringify(event)+'\n'))await once(res,'drain',{signal:controller.signal})};
-    try{await engine.run(job,controller.signal,emit,waitForResume);res.end()}catch(error){if(!controller.signal.aborted){res.end(JSON.stringify({type:'error',message:'Search interrupted. Retry unfinished names.'})+'\n')}}finally{clearInterval(heartbeat);jobs.delete(jobId);clients.delete(controller);active--}
+    try{await engine.run(job,controller.signal,emit,waitForResume);res.end()}catch(error){if(!controller.signal.aborted){console.error('Search backend failure:',error.code||error.name);res.end(JSON.stringify({type:'error',message:error.publicMessage||'Search backend failed. Check the server logs; unfinished names are preserved.'})+'\n')}}finally{clearInterval(heartbeat);jobs.delete(jobId);clients.delete(controller);active--}
     return;
    }
    if(!['GET','HEAD'].includes(req.method))return send(res,405,JSON.stringify({error:'Use GET.'}));
@@ -68,7 +68,7 @@ export function createApp(engine=createChecker()){
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
  let restrictions=[];if(process.env.RESTRICTIONS_FILE){restrictions=JSON.parse(await readFile(process.env.RESTRICTIONS_FILE,'utf8'));if(!Array.isArray(restrictions))throw Error('Restrictions evidence must be an array')}
- const engine=process.env.CHECK_WORKER_URL?createRemoteChecker({url:process.env.CHECK_WORKER_URL,secret:process.env.CHECK_WORKER_SECRET}):createChecker({restrictions});
+ const local=createChecker({restrictions});const engine=process.env.CHECK_WORKER_URL?withLocalConfigFallback(createRemoteChecker({url:process.env.CHECK_WORKER_URL,secret:process.env.CHECK_WORKER_SECRET}),local):local;
  const server=createApp(engine);server.listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('Four Name listening on port '+server.address().port));
  const shutdown=()=>{server.cancelSearches();server.close(()=>process.exit(0));setTimeout(()=>process.exit(0),10000).unref()};process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
 }

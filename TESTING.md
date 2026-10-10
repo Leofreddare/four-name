@@ -1,6 +1,6 @@
 # Verification — 2026-10-10
 
-All 31 automated tests passed under Node.js 24. Earlier live observations below are historical; this UI update did not repeat upstream checks.
+All 36 automated tests passed under Node.js 24. Earlier live observations below are historical; this UI update did not repeat upstream checks.
 
 - Platform formats, boundaries and case normalization for Minecraft, GitLab,
   Last.fm and Discord; reserved GitLab routes/AI prefixes and ambiguous suffixes.
@@ -58,3 +58,7 @@ claims are presented. No public deployment was performed.
 Current live probes successfully checked all four service adapters. Playwright remains blocked because Chromium is not installed; no visual screenshot or deployed-worker verification was performed. Worker test fixtures never enter production availability output.
 
 Latest UI revision: 31 tests pass. Optional icon loading, Available-only indexing, bounded 50-card rendering, slider behavior and SVG header buttons are covered. Benchmarks were rerun; see README and benchmarks/after.json. Actual browser paint/visual QA remains unavailable.
+
+Search recovery verification: 36 tests pass. New real-HTTP streaming regressions cover each service recovering from a misconfigured gateway, missing binding diagnostics, 90-second simulated busy/platform cooldown waits, same-batch retry, cancellation, no fallback after blocks/500/502/partial results or an earlier healthy remote run. UI assertions cover the new sliders glyph and 20% artwork transform.
+
+Fresh small live probes on 2026-10-10 returned Discord Taken/Available/Restricted, Minecraft Taken/Unknown, GitLab Taken/Available/Restricted and Last.fm Taken/Available. Minecraft authenticated name availability again returned HTTP 401 without credentials. These observations were made from this environment, not the user's Render or Cloudflare deployment; service behavior from provider IPs can differ.

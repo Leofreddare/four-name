@@ -1,6 +1,6 @@
 # Four Name
 
-Generate and check usernames while retaining the original dark/light theme and available-only result grid. Minecraft is selected by default. Minecraft and Discord are visible initially; Settings enables GitLab and Last.fm, saves service preferences in this browser and always leaves at least one service enabled. Searches select exactly one service. Settings, Documentation and the requested [GitHub repository](https://github.com/Leofreddare/four-name) use compact SVG icon buttons with accessible names and tooltips. The latest supplied Minecraft image, image(20261010-113801).png, is optimized to a 56×56 PNG (1,254 bytes) for 28 CSS pixels and embedded in the app. No separate image upload/request is needed. Colors and pixel artwork are preserved. The search count has one visible slider; generation mode is in Advanced and the explanatory paragraphs are removed.
+Generate and check usernames while retaining the original dark/light theme and available-only result grid. Minecraft is selected by default. Minecraft and Discord are visible initially; Settings enables GitLab and Last.fm, saves service preferences in this browser and always leaves at least one service enabled. Searches select exactly one service. Settings, Documentation and the requested [GitHub repository](https://github.com/Leofreddare/four-name) use compact SVG icon buttons with accessible names and tooltips. The latest supplied Minecraft image, image(20261010-113801).png, is optimized to a 56×56 PNG (1,254 bytes) for 22.4 CSS pixels (20% smaller inside the unchanged service button) and embedded in the app. No separate image upload/request is needed. Colors and pixel artwork are preserved. The search count has one visible slider; generation mode is in Advanced and the explanatory paragraphs are removed.
 
 ## Run
 
@@ -75,6 +75,12 @@ node benchmarks/measure.mjs
 npm run test:browser
 ```
 
-31 automated tests pass, covering coverage/resumption, English matching, service rules, restricted Minecraft evidence, rate limits, concurrency, cancellation, pause, compression/ETags, bounded DOM, optional service settings and worker validation. Small live probes on 2026-10-10 confirmed Minecraft Taken/Unknown, Discord Taken/Available/Restricted, GitLab Taken/Available/Restricted, Last.fm Taken/Available, and Minecraft availability's 401. Playwright screenshot verification could not run because its Chromium executable is unavailable in this environment; visual/real-browser responsiveness is not claimed verified.
+36 automated tests pass, covering coverage/resumption, English matching, service rules, restricted Minecraft evidence, rate limits, concurrency, cancellation, pause, compression/ETags, bounded DOM, optional service settings and worker validation. Small live probes on 2026-10-10 confirmed Minecraft Taken/Unknown, Discord Taken/Available/Restricted, GitLab Taken/Available/Restricted, Last.fm Taken/Available, and Minecraft availability's 401. Playwright screenshot verification could not run because its Chromium executable is unavailable in this environment; visual/real-browser responsiveness is not claimed verified.
 
 Original app/third-party notices remain in `licenses/`; the supplied branding is identified separately. See `SOURCES.md` for implementation/API research.
+
+## Search recovery update
+
+The server previously hid thrown worker failures behind the same generic Search interrupted message for all services. It now preserves safe, actionable gateway errors without exposing credentials. Known worker configuration failures before any remote checks were observed recover through one shared built-in Node checker; API blocks, throttling, timeouts, unrecognized errors, partial results and prior working remote checks never switch hosts. Worker 429 responses (numeric or date Retry-After) and platform cooldown rows wait and retry the same batch, with cancellation, pause and a three-retry bound. Correct the worker configuration and restart Render to return to Cloudflare.
+
+The Settings icon now uses the existing compact sliders glyph. Minecraft artwork alone is scaled down 20%; the button and its spacing stay unchanged.
